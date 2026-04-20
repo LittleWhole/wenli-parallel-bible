@@ -1063,6 +1063,23 @@ body {
   text-combine-upright: all;
 }
 
+/* Meiji Genyaku: furigana beside kanji in vertical columns */
+.verse-col ruby.meiji-ruby {
+  ruby-align: center;
+}
+
+.verse-col .meiji-ruby-text {
+  font-size: 0.46em;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.words-of-jesus .meiji-ruby-text {
+  color: inherit;
+  opacity: 0.92;
+}
+
 /* 專名號：直排中單底線（人名） */
 .verse-col .proper-noun {
   text-decoration-line: underline;
@@ -1075,6 +1092,12 @@ body {
   text-decoration-line: underline;
   text-decoration-style: double;
   text-decoration-color: currentColor;
+}
+
+/* Japanese (明治元譯): sideline on the right in vertical-rl — not the default “left” side */
+.verse-col.verse-col--ja .proper-noun,
+.verse-col.verse-col--ja .place-name {
+  text-underline-position: right;
 }
 
 /*

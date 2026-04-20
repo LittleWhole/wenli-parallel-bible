@@ -9,8 +9,14 @@ import {
   type BollsTranslation,
 } from "./bollsTranslations";
 import { fetchJson } from "./api";
+import { fetchJaWikisourceWikitext } from "./jaWikisource";
 import { fetchExistingWsBookSet, fetchWikisourceWikitext } from "./wikisource";
 import { extractVersesForChapter, type WikiVerse } from "./parseWiki";
+import { cleanMeijiVerseText } from "./parseMeiji";
+import { meijiJaBookTitle } from "./meijiBooks";
+import { extractTaisho4NtChapterFromBooks } from "./parseTaisho4";
+import { taisho4NtPageTitles } from "./taisho4Nt";
+import { loadZhSource, persistZhSource, ZH_SOURCE_LABEL, type ZhSource } from "./zhSource";
 import { stripHtml } from "./strings";
 import { useChineseFont } from "./useChineseFont";
 import { useParallelScroll } from "./useParallelScroll";
@@ -114,6 +120,7 @@ export default function App() {
   const [enStatus, setEnStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [hoveredVerse, setHoveredVerse] = useState<number | null>(null);
+  const [zhSource, setZhSource] = useState<ZhSource>(() => loadZhSource());
 
   // Pre-process English verses: strip HTML and carry open-quote state across consecutive
   // red-letter verses so multi-verse speeches stay highlighted end-to-end.
@@ -184,6 +191,10 @@ export default function App() {
     persistEnTranslation(enTranslation);
   }, [enTranslation]);
 
+  useEffect(() => {
+    persistZhSource(zhSource);
+  }, [zhSource]);
+
   const loadGeneration = useRef(0);
   const flightRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
@@ -199,20 +210,22 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const [bollsBooks, wsPresent] = await Promise.all([
-          fetchJson(`${BOLLS}/get-books/${enTranslation}/`) as Promise<BollsBook[]>,
-          fetchExistingWsBookSet(),
-        ]);
+        const bollsBooks = (await fetchJson(`${BOLLS}/get-books/${enTranslation}/`)) as BollsBook[];
         if (cancelled) return;
         const byId = Object.fromEntries(bollsBooks.map((b) => [String(b.bookid), b]));
+        const wsPresent = zhSource === "wenli" ? await fetchExistingWsBookSet() : null;
         const opts: BookRow[] = [];
         for (const def of WS_BOOKS) {
-          if (!wsPresent.has(def.ws)) continue;
+          if (zhSource === "wenli" && wsPresent && !wsPresent.has(def.ws)) continue;
           const b = byId[String(def.id)];
           opts.push({ def, chapters: b?.chapters });
         }
         if (!opts.length) {
-          throw new Error("維基文庫上找不到《聖經 (文理和合)》任何子頁；請稍後再試。");
+          throw new Error(
+            zhSource === "wenli"
+              ? "維基文庫上找不到《聖經 (文理和合)》任何子頁；請稍後再試。"
+              : "無法從 Bolls 取得書卷列表。",
+          );
         }
         setBookOptions(opts);
         setBookId((prev) => (opts.some((o) => o.def.id === prev) ? prev : opts.find((o) => o.def.id === 43)?.def.id ?? opts[0].def.id));
@@ -225,7 +238,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [enTranslation]);
+  }, [enTranslation, zhSource]);
 
   const chapterMax = bookOptions.find((o) => o.def.id === bookId)?.chapters;
 
@@ -254,22 +267,52 @@ export default function App() {
       return;
     }
     const ch = Math.max(1, Math.floor(Number(chapter)) || 1);
-    const label = `${def.en} · ${def.ws}`;
+    const label =
+      zhSource === "meiji"
+        ? `${def.en} · ${meijiJaBookTitle(bookId) ?? def.ws}`
+        : `${def.en} · ${def.ws}`;
 
     try {
-      const [{ wikitext, title }, enRaw] = await Promise.all([
-        fetchWikisourceWikitext(def.ws, signal),
-        fetchJson(`${BOLLS}/get-text/${enTranslation}/${bookId}/${ch}/`, { signal }) as Promise<
-          { verse: number; text: string }[]
-        >,
-      ]);
+      const enP = fetchJson(`${BOLLS}/get-text/${enTranslation}/${bookId}/${ch}/`, { signal }) as Promise<
+        { verse: number; text: string }[]
+      >;
+
+      let zh: WikiVerse[] = [];
+      let zhPageTitle = "";
+
+      if (zhSource === "wenli") {
+        const { wikitext, title } = await fetchWikisourceWikitext(def.ws, signal);
+        zhPageTitle = title;
+        zh = extractVersesForChapter(wikitext, ch);
+      } else {
+        const jaBase = meijiJaBookTitle(bookId);
+        if (!jaBase) throw new Error("Unknown book for Meiji source.");
+        if (bookId >= 40) {
+          const pages = taisho4NtPageTitles(bookId);
+          if (!pages?.length) throw new Error(`明治元譯（大正四年新約）：未登録の書です（bookId ${bookId}）。`);
+          let concat = "";
+          for (let pi = 0; pi < pages.length; pi++) {
+            const r = await fetchJaWikisourceWikitext(pages[pi]!, signal);
+            if (pi === 0) zhPageTitle = r.title;
+            concat += r.wikitext + "\n";
+          }
+          zh = extractTaisho4NtChapterFromBooks(concat, ch);
+        } else {
+          const { wikitext, title } = await fetchJaWikisourceWikitext(jaBase, signal);
+          zhPageTitle = title;
+          zh = extractVersesForChapter(wikitext, ch, cleanMeijiVerseText);
+        }
+      }
+
+      const enRaw = await enP;
 
       if (signal.aborted || myGen !== loadGeneration.current) return;
 
-      const zh = extractVersesForChapter(wikitext, ch);
       if (!zh.length) {
         throw new Error(
-          `維基文庫此卷未解析到第 ${ch} 節（頁面「${title}」）。請確認該章存在，或章節標記與源文一致。`,
+          zhSource === "wenli"
+            ? `維基文庫此卷未解析到第 ${ch} 節（頁面「${zhPageTitle}」）。請確認該章存在，或章節標記與源文一致。`
+            : `明治元譯此卷未解析到節文（頁面「${zhPageTitle}」）。`,
         );
       }
 
@@ -288,7 +331,7 @@ export default function App() {
     } finally {
       if (myGen === loadGeneration.current) setLoading(false);
     }
-  }, [bookId, chapter, enTranslation]);
+  }, [bookId, chapter, enTranslation, zhSource]);
 
   useEffect(() => {
     if (!bookOptions.length) return;
@@ -301,7 +344,7 @@ export default function App() {
       clearDebounceTimer();
       flightRef.current?.abort();
     };
-  }, [bookId, chapter, enTranslation, bookOptions.length, runLoad, clearDebounceTimer]);
+  }, [bookId, chapter, enTranslation, zhSource, bookOptions.length, runLoad, clearDebounceTimer]);
 
   const handleBookChange = useCallback((id: number) => {
     setBookId(id);
@@ -375,6 +418,19 @@ export default function App() {
               </span>
               <span className="btn-theme-text">{darkMode ? "Light" : "Dark"}</span>
             </button>
+            <div className="setting-inline setting-zh-source">
+              <label htmlFor="zh-source">中文欄</label>
+              <select
+                id="zh-source"
+                className="select-compact select-zh-source"
+                aria-label="Chinese column Bible text"
+                value={zhSource}
+                onChange={(e) => setZhSource(e.target.value as ZhSource)}
+              >
+                <option value="wenli">{ZH_SOURCE_LABEL.wenli}</option>
+                <option value="meiji">{ZH_SOURCE_LABEL.meiji}</option>
+              </select>
+            </div>
             <div className="setting-inline">
               <label htmlFor="zh-font">字體</label>
               <select
@@ -429,6 +485,7 @@ export default function App() {
           onVerseHover={setHoveredVerse}
           redLetterVerses={redLetterOn ? new Set(redLetter[String(bookId)]?.[String(chapter)] ?? []) : new Set()}
           englishFullyRedVerses={englishFullyRedVerses}
+          zhSource={zhSource}
         />
 
         <section className="pane" aria-labelledby="en-title">

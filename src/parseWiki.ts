@@ -64,7 +64,11 @@ export function cleanWikiVerseText(raw: string) {
 
 export type WikiVerse = { verse: string; text: string };
 
-export function extractVersesForChapter(wikitext: string, targetChapter: number): WikiVerse[] {
+export function extractVersesForChapter(
+  wikitext: string,
+  targetChapter: number,
+  cleanVerseText: (raw: string) => string = cleanWikiVerseText,
+): WikiVerse[] {
   const re = /\{\{verse\|([^}]+)\}\}/g;
   const found: WikiVerse[] = [];
   let m: RegExpExecArray | null;
@@ -84,7 +88,7 @@ export function extractVersesForChapter(wikitext: string, targetChapter: number)
       if (c >= 0 && c < end) end = c;
     }
     const rawText = rest.slice(0, end);
-    found.push({ verse, text: cleanWikiVerseText(rawText) });
+    found.push({ verse, text: cleanVerseText(rawText) });
   }
   found.sort(
     (a, b) =>

@@ -563,10 +563,24 @@ body {
 
 /* 專名號：直排中底線在字面左側 */
 .verse-col .proper-noun {
-  text-decoration: underline solid currentColor 1px;
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-color: currentColor;
 }
 
 /* 書名號：直排中波浪底線在字面左側 */
 .verse-col .book-name {
-  text-decoration: underline wavy currentColor 1px;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: currentColor;
+}
+
+/*
+ * Inside red-letter speech, currentColor is #b91c1c — a red underline on red text
+ * is invisible against the character strokes. Use the accent colour instead so
+ * both 專名線 and 書名線 remain legible.
+ */
+.verse-col .words-of-jesus .proper-noun,
+.verse-col .words-of-jesus .book-name {
+  text-decoration-color: var(--accent);
 }

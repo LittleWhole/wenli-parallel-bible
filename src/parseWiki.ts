@@ -32,7 +32,12 @@ export function cleanWikiVerseText(raw: string) {
   t = t.replace(/<[^>]+>/g, "");
   t = t.replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, "$2");
   t = t.replace(/\[\[([^\]]+)\]\]/g, "$1");
-  t = t.replace(/\{\{[^}]+\}\}/g, "");
+  // Extract the display text from single-pipe templates like {{ul|亞伯拉罕}} → 亞伯拉罕.
+  // Run twice to handle adjacent/nested occurrences.
+  t = t.replace(/\{\{[^|{}]+\|([^|{}]+)\}\}/g, "$1");
+  t = t.replace(/\{\{[^|{}]+\|([^|{}]+)\}\}/g, "$1");
+  // Remove any remaining templates (multi-arg, no content, etc.).
+  t = t.replace(/\{\{[^}]*\}\}/g, "");
   t = t.replace(/[ \t\u3000]+/g, " ").trim();
   return t;
 }

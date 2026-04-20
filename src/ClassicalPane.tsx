@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useMemo, type RefObject } from "react";
 import type { WikiVerse } from "./parseWiki";
 import { ZhVerseBody } from "./ZhVerseBody";
 
@@ -19,6 +19,26 @@ function displayVerses(verses: WikiVerse[]) {
 
 export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredVerse, onVerseHover, redLetterVerses }: Props) {
   const cols = displayVerses(verses);
+
+  // Pre-compute per-verse speech start state (carries 曰/○ state across consecutive red-letter verses).
+  const speechStateMap = useMemo(() => {
+    const map = new Map<number, boolean>();
+    let inSpeech = false;
+    for (const v of verses) {
+      const verseNum = parseInt(String(v.verse), 10);
+      if (!redLetterVerses.has(verseNum)) {
+        inSpeech = false;
+        map.set(verseNum, false);
+        continue;
+      }
+      map.set(verseNum, inSpeech);
+      for (const ch of v.text) {
+        if (ch === "曰") inSpeech = true;
+        else if (ch === "○") inSpeech = false;
+      }
+    }
+    return map;
+  }, [verses, redLetterVerses]);
 
   return (
     <section className="pane classical-pane" aria-labelledby="zh-title">
@@ -48,6 +68,7 @@ export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredV
                   text={v.text}
                   verseKey={String(v.verse)}
                   isRedLetterVerse={redLetterVerses.has(verseNum)}
+                  startsInSpeech={speechStateMap.get(verseNum) ?? false}
                 />
               </div>
             );

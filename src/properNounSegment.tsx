@@ -53,27 +53,28 @@ const BOOK_NAME_RE = /《([^》]*)》/g;
 
 // Split text into speech/non-speech segments using 曰 (speaker attribution) and ○ (paragraph break).
 // Text immediately after 曰 is speech (red); ○ resets back to non-speech.
+// startsInSpeech carries state from the previous verse for continuous multi-verse speeches.
 type YueSeg = { text: string; red: boolean };
-function splitByYue(text: string): YueSeg[] {
-  const segments: YueSeg[] = [];
-  let inSpeech = false;
+function splitByYue(text: string, startsInSpeech = false): { segs: YueSeg[]; endsInSpeech: boolean } {
+  const segs: YueSeg[] = [];
+  let inSpeech = startsInSpeech;
   let segStart = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (ch === "曰") {
-      if (i > segStart) segments.push({ text: text.slice(segStart, i), red: inSpeech });
-      segments.push({ text: "曰", red: false });
+      if (i > segStart) segs.push({ text: text.slice(segStart, i), red: inSpeech });
+      segs.push({ text: "曰", red: false });
       segStart = i + 1;
       inSpeech = true;
     } else if (ch === "○") {
-      if (i > segStart) segments.push({ text: text.slice(segStart, i), red: inSpeech });
-      segments.push({ text: "○", red: false });
+      if (i > segStart) segs.push({ text: text.slice(segStart, i), red: inSpeech });
+      segs.push({ text: "○", red: false });
       segStart = i + 1;
       inSpeech = false;
     }
   }
-  if (segStart < text.length) segments.push({ text: text.slice(segStart), red: inSpeech });
-  return segments;
+  if (segStart < text.length) segs.push({ text: text.slice(segStart), red: inSpeech });
+  return { segs, endsInSpeech: inSpeech };
 }
 
 /**
@@ -86,6 +87,7 @@ export function renderZhWithProperNouns(
   text: string,
   verseKey: string,
   isRedLetterVerse = false,
+  startsInSpeech = false,
 ): ReactNode {
   let keyIdx = 0;
   const k = () => `${verseKey}-${keyIdx++}`;
@@ -118,7 +120,7 @@ export function renderZhWithProperNouns(
   const parts: ReactNode[] = [];
 
   if (isRedLetterVerse) {
-    const yueSegs = splitByYue(text);
+    const { segs: yueSegs } = splitByYue(text, startsInSpeech);
     if (yueSegs.some((s) => s.red)) {
       for (const ySeg of yueSegs) {
         const nodes = renderChunkNodes(ySeg.text);

@@ -9,14 +9,16 @@
  *  2. 專名線 (solid underline) — proper nouns marked {{ul|…}} by Wikisource.
  *     Sentinel chars \uE001…\uE002 embedded by cleanWikiVerseText().
  *
+ *  2b. 專名線 — longest-match trie on plain text from biblical-proper-nouns.txt
+ *      (e.g. 耶穌, 上帝, 聖靈) so key terms are always underlined even when the
+ *      source page omits {{ul|…}}.
+ *
  *  3. 地名線 (double underline) — place names marked {{du|…}} by Wikisource.
  *     Sentinel chars \uE003…\uE004 embedded by cleanWikiVerseText().
- *
- * The trie data files (biblical-proper-nouns.txt / biblical-place-names.txt)
- * are kept for reference but are not used in active rendering.
  */
 import { Fragment, type ReactNode } from "react";
 import bookNamesRaw from "./data/biblical-book-names.txt?raw";
+import mandatoryProperRaw from "./data/biblical-proper-nouns.txt?raw";
 import { buildProperNounTrie } from "./properNounTrie";
 import { UL_OPEN, UL_CLOSE, DU_OPEN, DU_CLOSE } from "./parseWiki";
 
@@ -34,10 +36,46 @@ function loadLines(raw: string): string[] {
 }
 
 const findBookName = buildProperNounTrie(loadLines(bookNamesRaw));
+const findMandatoryProper = buildProperNounTrie(loadLines(mandatoryProperRaw));
+
+/** Apply mandatory proper-noun spans to a plain-text run (no sentinels). Longest match wins at each offset. */
+function wrapMandatoryProperInPlain(plain: string, keyFn: () => string): ReactNode[] {
+  if (!plain) return [];
+  const out: ReactNode[] = [];
+  let buf = "";
+  const flushBuf = () => {
+    if (buf) {
+      out.push(buf);
+      buf = "";
+    }
+  };
+  let i = 0;
+  while (i < plain.length) {
+    const m = findMandatoryProper(plain, i);
+    if (m) {
+      flushBuf();
+      out.push(
+        <span className="proper-noun" key={keyFn()} translate="no">
+          {m}
+        </span>,
+      );
+      i += m.length;
+    } else {
+      buf += plain[i];
+      i += 1;
+    }
+  }
+  flushBuf();
+  return out;
+}
 
 // ── Speech segmentation (曰 / ○) ─────────────────────────────────────────────
 
 type YueSeg = { text: string; red: boolean };
+
+export function zhVerseHasYueRedSpeech(text: string, startsInSpeech = false): boolean {
+  return splitByYue(text, startsInSpeech).segs.some((s) => s.red);
+}
 
 function splitByYue(text: string, startsInSpeech = false): { segs: YueSeg[]; endsInSpeech: boolean } {
   const segs: YueSeg[] = [];
@@ -76,7 +114,7 @@ const SENTINEL_RE = /[\uE001\uE002\uE003\uE004]/g;
  *        corresponding sentinel range and emit a <span.book-name>.
  *     b. Else if char is UL_OPEN  → consume up to matching UL_CLOSE → <span.proper-noun>.
  *     c. Else if char is DU_OPEN  → consume up to matching DU_CLOSE → <span.place-name>.
- *     d. Else → accumulate plain text.
+ *     d. Else → accumulate plain text; on flush, run mandatory proper-noun trie on the run.
  */
 function renderAnnotatedChunk(text: string, keyFn: () => string): ReactNode[] {
   // ── Step 1: position map ─────────────────────────────────────────────────
@@ -109,7 +147,9 @@ function renderAnnotatedChunk(text: string, keyFn: () => string): ReactNode[] {
   const result: ReactNode[] = [];
   let plainBuf = "";
   const flushPlain = () => {
-    if (plainBuf) { result.push(plainBuf); plainBuf = ""; }
+    if (!plainBuf) return;
+    result.push(...wrapMandatoryProperInPlain(plainBuf, keyFn));
+    plainBuf = "";
   };
 
   let i = 0;
@@ -174,6 +214,7 @@ export function renderZhWithProperNouns(
   verseKey: string,
   isRedLetterVerse = false,
   startsInSpeech = false,
+  forceFullVerseRed = false,
 ): ReactNode {
   let keyIdx = 0;
   const k = () => `${verseKey}-${keyIdx++}`;
@@ -182,7 +223,15 @@ export function renderZhWithProperNouns(
 
   if (isRedLetterVerse) {
     const { segs: yueSegs } = splitByYue(text, startsInSpeech);
-    if (yueSegs.some((s) => s.red)) {
+    const hasYueRed = yueSegs.some((s) => s.red);
+    if (forceFullVerseRed && !hasYueRed) {
+      return (
+        <span className="words-of-jesus" translate="no">
+          {renderAnnotatedChunk(text, k)}
+        </span>
+      );
+    }
+    if (hasYueRed) {
       for (const ySeg of yueSegs) {
         const nodes = renderAnnotatedChunk(ySeg.text, k);
         if (ySeg.red) {

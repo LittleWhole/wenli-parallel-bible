@@ -54,6 +54,27 @@ function renderEnRedLetter(text: string, startsInQuote = false) {
   return <>{parts}</>;
 }
 
+/** True when every character of `text` is rendered inside red-letter spans (matches {@link renderEnRedLetter}). */
+function enVerseIsEntirelyRedLetter(text: string, startsInQuote: boolean): boolean {
+  if (text.length === 0) return false;
+  let inQuote = startsInQuote;
+  let segStart = 0;
+  let hasBlack = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === OPEN_QUOTE && !inQuote) {
+      if (i > segStart) hasBlack = true;
+      segStart = i;
+      inQuote = true;
+    } else if (ch === CLOSE_QUOTE && inQuote) {
+      segStart = i + 1;
+      inQuote = false;
+    }
+  }
+  if (segStart < text.length && !inQuote) hasBlack = true;
+  return !hasBlack;
+}
+
 export default function App() {
   const { fontId, setFontId, presets } = useChineseFont();
   const [scrollRevision, setScrollRevision] = useState(0);
@@ -113,6 +134,17 @@ export default function App() {
       return { verse: v.verse, text, startsInQuote };
     });
   }, [enVerses, bookId, chapter]);
+
+  /** Verses whose English text is 100% red-letter; used to force full-verse red on 文言 when 曰/○ never open speech. */
+  const englishFullyRedVerses = useMemo(() => {
+    const s = new Set<number>();
+    if (!redLetterOn) return s;
+    for (const v of processedEnVerses) {
+      if (!isRedLetter(bookId, chapter, v.verse)) continue;
+      if (enVerseIsEntirelyRedLetter(v.text, v.startsInQuote)) s.add(v.verse);
+    }
+    return s;
+  }, [processedEnVerses, redLetterOn, bookId, chapter]);
 
   const enFullName = useMemo(
     () => enTranslations.find((t) => t.short_name === enTranslation)?.full_name ?? enTranslation,
@@ -396,13 +428,19 @@ export default function App() {
           hoveredVerse={hoveredVerse}
           onVerseHover={setHoveredVerse}
           redLetterVerses={redLetterOn ? new Set(redLetter[String(bookId)]?.[String(chapter)] ?? []) : new Set()}
+          englishFullyRedVerses={englishFullyRedVerses}
         />
 
         <section className="pane" aria-labelledby="en-title">
-          <div className="pane-head">
-            <h2 id="en-title">{enFullName}</h2>
-            <div className="ref-line" aria-live="polite">
-              {enRefLine}
+          <div className="pane-head pane-head-en">
+            <div className="pane-head-en-main">
+              <h2 id="en-title">{enFullName}</h2>
+              <div className="ref-line" aria-live="polite">
+                {enRefLine}
+              </div>
+            </div>
+            <div className="en-chapter-promo" aria-hidden="true">
+              {chapter}
             </div>
           </div>
           <div ref={enScrollRef} className="pane-scroll-en" role="region" aria-label="English Bible scroll area">

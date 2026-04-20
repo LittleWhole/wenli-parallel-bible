@@ -1,5 +1,6 @@
 import { useMemo, type RefObject } from "react";
 import type { WikiVerse } from "./parseWiki";
+import { zhVerseHasYueRedSpeech } from "./properNounSegment";
 import { ZhVerseBody } from "./ZhVerseBody";
 
 type Props = {
@@ -10,6 +11,8 @@ type Props = {
   hoveredVerse: number | null;
   onVerseHover: (verse: number | null) => void;
   redLetterVerses: Set<number>;
+  /** English verse is 100% red-letter; enables full-verse 文言 red when 曰/○ do not open speech. */
+  englishFullyRedVerses: Set<number>;
 };
 
 /** DOM order reversed so `flex-direction: row` still puts verse 1 on the right (traditional column order). */
@@ -17,10 +20,22 @@ function displayVerses(verses: WikiVerse[]) {
   return verses.length ? [...verses].reverse() : [];
 }
 
-export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredVerse, onVerseHover, redLetterVerses }: Props) {
+export function ClassicalPane({
+  horizontalRef,
+  verses,
+  refLine,
+  status,
+  hoveredVerse,
+  onVerseHover,
+  redLetterVerses,
+  englishFullyRedVerses,
+}: Props) {
   const cols = displayVerses(verses);
 
   // Pre-compute per-verse speech start state (carries 曰/○ state across consecutive red-letter verses).
+  // When English is 100% red-letter but 曰/○ never produce red text here, we force full-verse red and do
+  // not carry 曰/○ state onward (next verse is black unless it has its own red). If 曰/○ do produce red,
+  // carry behaves as usual.
   const speechStateMap = useMemo(() => {
     const map = new Map<number, boolean>();
     let inSpeech = false;
@@ -32,13 +47,19 @@ export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredV
         continue;
       }
       map.set(verseNum, inSpeech);
+      const blockCarry =
+        englishFullyRedVerses.has(verseNum) && !zhVerseHasYueRedSpeech(v.text, inSpeech);
+      if (blockCarry) {
+        inSpeech = false;
+        continue;
+      }
       for (const ch of v.text) {
         if (ch === "曰") inSpeech = true;
         else if (ch === "○") inSpeech = false;
       }
     }
     return map;
-  }, [verses, redLetterVerses]);
+  }, [verses, redLetterVerses, englishFullyRedVerses]);
 
   return (
     <section className="pane classical-pane" aria-labelledby="zh-title">
@@ -69,6 +90,7 @@ export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredV
                   verseKey={String(v.verse)}
                   isRedLetterVerse={redLetterVerses.has(verseNum)}
                   startsInSpeech={speechStateMap.get(verseNum) ?? false}
+                  forceFullVerseRed={englishFullyRedVerses.has(verseNum)}
                 />
               </div>
             );

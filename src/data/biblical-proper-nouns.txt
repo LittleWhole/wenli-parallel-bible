@@ -1,5 +1,9 @@
 # Traditional Chinese biblical proper nouns / 專名 (文理和合及常見聖經用語)
 # Lines starting with # are ignored. Longest-match trie: order does not matter.
+# Also matched automatically in the reader (solid underline) when not marked in source.
+# Simplified-script variants for the same terms:
+耶稣
+圣靈
 萬軍之耶和華
 以色列的神
 至高的神

@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BOLLS, WS_BOOKS } from "./constants";
 import redLetterRaw from "./data/red-letter-verses.json";
+import {
+  DEFAULT_EN_TRANSLATION,
+  fetchEnglishTranslations,
+  loadStoredEnTranslation,
+  persistEnTranslation,
+  type BollsTranslation,
+} from "./bollsTranslations";
 import { fetchJson } from "./api";
 import { fetchExistingWsBookSet, fetchWikisourceWikitext } from "./wikisource";
 import { extractVersesForChapter, type WikiVerse } from "./parseWiki";
@@ -55,10 +62,29 @@ export default function App() {
   const [bookOptions, setBookOptions] = useState<BookRow[]>([]);
   const [bookId, setBookId] = useState(43);
   const [chapter, setChapter] = useState(3);
-  const [nivEdition, setNivEdition] = useState("NIV2011");
+  const [enTranslation, setEnTranslation] = useState(loadStoredEnTranslation);
+  const [enTranslations, setEnTranslations] = useState<BollsTranslation[]>([]);
   const [redLetterOn, setRedLetterOn] = useState<boolean>(() => {
     try { return localStorage.getItem("bible-red-letter") !== "off"; } catch { return true; }
   });
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    try {
+      const s = localStorage.getItem("bible-theme");
+      if (s === "dark" || s === "light") return s === "dark";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    try {
+      localStorage.setItem("bible-theme", darkMode ? "dark" : "light");
+    } catch {
+      /* ignore */
+    }
+  }, [darkMode]);
   const [zhVerses, setZhVerses] = useState<WikiVerse[]>([]);
   const [enVerses, setEnVerses] = useState<{ verse: number; text: string }[]>([]);
   const [zhRefLine, setZhRefLine] = useState("");
@@ -88,6 +114,44 @@ export default function App() {
     });
   }, [enVerses, bookId, chapter]);
 
+  const enFullName = useMemo(
+    () => enTranslations.find((t) => t.short_name === enTranslation)?.full_name ?? enTranslation,
+    [enTranslations, enTranslation],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchEnglishTranslations()
+      .then((list) => {
+        if (cancelled || !list.length) return;
+        setEnTranslations(list);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setEnTranslations([
+          { short_name: "NIV2011", full_name: "New International Version, 2011" },
+          { short_name: "NIV", full_name: "New International Version, 1984" },
+          { short_name: "ESV", full_name: "English Standard Version" },
+          { short_name: "KJV", full_name: "King James Version" },
+          { short_name: "NKJV", full_name: "New King James Version" },
+        ]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enTranslations.length) return;
+    if (!enTranslations.some((t) => t.short_name === enTranslation)) {
+      setEnTranslation(DEFAULT_EN_TRANSLATION);
+    }
+  }, [enTranslations, enTranslation]);
+
+  useEffect(() => {
+    persistEnTranslation(enTranslation);
+  }, [enTranslation]);
+
   const loadGeneration = useRef(0);
   const flightRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<number | null>(null);
@@ -104,7 +168,7 @@ export default function App() {
     (async () => {
       try {
         const [bollsBooks, wsPresent] = await Promise.all([
-          fetchJson(`${BOLLS}/get-books/NIV2011/`) as Promise<BollsBook[]>,
+          fetchJson(`${BOLLS}/get-books/${enTranslation}/`) as Promise<BollsBook[]>,
           fetchExistingWsBookSet(),
         ]);
         if (cancelled) return;
@@ -119,8 +183,7 @@ export default function App() {
           throw new Error("維基文庫上找不到《聖經 (文理和合)》任何子頁；請稍後再試。");
         }
         setBookOptions(opts);
-        const john = opts.find((o) => o.def.id === 43);
-        setBookId(john ? 43 : opts[0].def.id);
+        setBookId((prev) => (opts.some((o) => o.def.id === prev) ? prev : opts.find((o) => o.def.id === 43)?.def.id ?? opts[0].def.id));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setZhStatus(`Could not initialize: ${msg}`);
@@ -130,7 +193,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enTranslation]);
 
   const chapterMax = bookOptions.find((o) => o.def.id === bookId)?.chapters;
 
@@ -164,7 +227,7 @@ export default function App() {
     try {
       const [{ wikitext, title }, enRaw] = await Promise.all([
         fetchWikisourceWikitext(def.ws, signal),
-        fetchJson(`${BOLLS}/get-text/${nivEdition}/${bookId}/${ch}/`, { signal }) as Promise<
+        fetchJson(`${BOLLS}/get-text/${enTranslation}/${bookId}/${ch}/`, { signal }) as Promise<
           { verse: number; text: string }[]
         >,
       ]);
@@ -180,7 +243,7 @@ export default function App() {
 
       const ref = `${label} ${ch}`;
       setZhRefLine(`${ref}`);
-      setEnRefLine(`${ref} · ${nivEdition}`);
+      setEnRefLine(`${ref} · ${enTranslation}`);
       setZhVerses(zh);
       setEnVerses(enRaw);
       setScrollRevision((n) => n + 1);
@@ -193,7 +256,7 @@ export default function App() {
     } finally {
       if (myGen === loadGeneration.current) setLoading(false);
     }
-  }, [bookId, chapter, nivEdition]);
+  }, [bookId, chapter, enTranslation]);
 
   useEffect(() => {
     if (!bookOptions.length) return;
@@ -206,7 +269,7 @@ export default function App() {
       clearDebounceTimer();
       flightRef.current?.abort();
     };
-  }, [bookId, chapter, nivEdition, bookOptions.length, runLoad, clearDebounceTimer]);
+  }, [bookId, chapter, enTranslation, bookOptions.length, runLoad, clearDebounceTimer]);
 
   const handleBookChange = useCallback((id: number) => {
     setBookId(id);
@@ -232,17 +295,25 @@ export default function App() {
         <div className="header-toolbar">
           <h1>Parallel Bible</h1>
           <div className="header-settings">
-            <div className="setting-inline">
-              <label htmlFor="niv-edition">NIV</label>
+            <div className="setting-inline setting-en-translation">
+              <label htmlFor="en-translation">English</label>
               <select
-                id="niv-edition"
-                className="select-compact"
-                aria-label="NIV edition"
-                value={nivEdition}
-                onChange={(e) => setNivEdition(e.target.value)}
+                id="en-translation"
+                className="select-compact select-en-translation"
+                aria-label="English Bible translation"
+                value={enTranslation}
+                disabled={enTranslations.length === 0}
+                onChange={(e) => setEnTranslation(e.target.value)}
               >
-                <option value="NIV2011">2011</option>
-                <option value="NIV">1984</option>
+                {enTranslations.length === 0 ? (
+                  <option value={enTranslation}>{enTranslation}</option>
+                ) : (
+                  enTranslations.map((t) => (
+                    <option key={t.short_name} value={t.short_name} title={t.full_name}>
+                      {t.short_name} — {t.full_name}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
             <button
@@ -259,6 +330,18 @@ export default function App() {
               title="Toggle red-letter (words of Jesus)"
             >
               Red letter
+            </button>
+            <button
+              type="button"
+              className={`btn-theme${darkMode ? " is-dark" : ""}`}
+              aria-pressed={darkMode}
+              onClick={() => setDarkMode((v) => !v)}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              <span className="btn-theme-icon" aria-hidden>
+                {darkMode ? "☀" : "☽"}
+              </span>
+              <span className="btn-theme-text">{darkMode ? "Light" : "Dark"}</span>
             </button>
             <div className="setting-inline">
               <label htmlFor="zh-font">字體</label>
@@ -317,13 +400,13 @@ export default function App() {
 
         <section className="pane" aria-labelledby="en-title">
           <div className="pane-head">
-            <h2 id="en-title">New International Version</h2>
+            <h2 id="en-title">{enFullName}</h2>
             <div className="ref-line" aria-live="polite">
               {enRefLine}
             </div>
           </div>
-          <div ref={enScrollRef} className="pane-scroll-en" role="region" aria-label="NIV scroll area">
-            <div className="niv-verses" aria-label="NIV text">
+          <div ref={enScrollRef} className="pane-scroll-en" role="region" aria-label="English Bible scroll area">
+            <div className="niv-verses" aria-label="English Bible text">
               {processedEnVerses.map((v) => (
                 <p
                   key={v.verse}

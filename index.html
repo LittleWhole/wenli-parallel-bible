@@ -16,6 +16,18 @@
       rel="stylesheet"
     />
     <link rel="preconnect" href="https://bolls.life" />
+    <script>
+      (function () {
+        try {
+          var s = localStorage.getItem("bible-theme");
+          if (s === "dark" || s === "light") {
+            document.documentElement.dataset.theme = s;
+          } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.dataset.theme = "dark";
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

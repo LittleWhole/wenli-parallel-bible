@@ -27,13 +27,33 @@ export function verseSortKey(verseLabel: string) {
   return m ? parseInt(m[1], 10) : 0;
 }
 
+/**
+ * Sentinel characters (Unicode Private Use Area) embedded in cleaned verse text
+ * to carry Wikisource annotation through to the rendering layer.
+ *
+ *   {{ul|name}}  →  UL_OPEN + name + UL_CLOSE   (proper noun — 專名號)
+ *   {{du|name}}  →  DU_OPEN + name + DU_CLOSE   (place  name — 地名號)
+ *
+ * These are consumed by renderZhWithProperNouns() in properNounSegment.tsx.
+ * Book titles detected by the trie override whatever sentinel marks cover the
+ * same span (e.g. "以賽亞書" beats the {{ul|以賽亞}} + "書" split).
+ */
+export const UL_OPEN  = "\uE001";
+export const UL_CLOSE = "\uE002";
+export const DU_OPEN  = "\uE003";
+export const DU_CLOSE = "\uE004";
+
 export function cleanWikiVerseText(raw: string) {
   let t = raw;
   t = t.replace(/<[^>]+>/g, "");
   t = t.replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, "$2");
   t = t.replace(/\[\[([^\]]+)\]\]/g, "$1");
-  // Extract the display text from single-pipe templates like {{ul|亞伯拉罕}} → 亞伯拉罕.
-  // Run twice to handle adjacent/nested occurrences.
+  // Wrap {{ul|name}} and {{du|name}} with sentinels BEFORE the generic
+  // single-pipe extractor runs, so their annotation survives cleaning.
+  t = t.replace(/\{\{ul\|([^|{}]+)\}\}/g, `${UL_OPEN}$1${UL_CLOSE}`);
+  t = t.replace(/\{\{du\|([^|{}]+)\}\}/g, `${DU_OPEN}$1${DU_CLOSE}`);
+  // Extract display text from remaining single-pipe templates (run twice for
+  // adjacent occurrences left after the ul/du pass).
   t = t.replace(/\{\{[^|{}]+\|([^|{}]+)\}\}/g, "$1");
   t = t.replace(/\{\{[^|{}]+\|([^|{}]+)\}\}/g, "$1");
   // Remove any remaining templates (multi-arg, no content, etc.).

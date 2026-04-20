@@ -1,0 +1,104 @@
+# Biblical book names as they appear in the 文理和合 (Wenli Union Version) text.
+# Includes all 66 canonical books and non-canonical books explicitly referenced
+# in the canonical text (e.g. 雅煞珥紀 in Joshua / 2 Samuel).
+# One name per line; lines beginning with # are comments.
+# Longer entries (e.g. 以色列列王紀) take priority over shorter ones (e.g. 列王紀上)
+# because the trie always returns the longest match at any position.
+
+# ── Old Testament ──────────────────────────────────────────────────────────────
+創世記
+出埃及記
+利未記
+民數記
+申命記
+約書亞記
+士師記
+路得記
+撒母耳記上
+撒母耳記下
+列王紀上
+列王紀下
+歷代志上
+歷代志下
+以斯拉記
+尼希米記
+以斯帖記
+約伯記
+詩篇
+箴言
+傳道書
+雅歌
+以賽亞書
+耶利米書
+耶利米哀歌
+以西結書
+但以理書
+何西阿書
+約珥書
+阿摩司書
+俄巴底亞書
+約拿書
+彌迦書
+那鴻書
+哈巴谷書
+西番雅書
+哈該書
+撒迦利亞書
+瑪拉基書
+
+# ── New Testament ──────────────────────────────────────────────────────────────
+馬太福音
+馬可福音
+路加福音
+約翰福音
+使徒行傳
+羅馬書
+哥林多前書
+哥林多後書
+加拉太書
+以弗所書
+腓立比書
+歌羅西書
+帖撒羅尼迦前書
+帖撒羅尼迦後書
+提摩太前書
+提摩太後書
+提多書
+腓利門書
+希伯來書
+雅各書
+彼得前書
+彼得後書
+約翰一書
+約翰二書
+約翰三書
+猶大書
+啟示錄
+
+# ── Non-canonical books explicitly referenced in canonical scripture ────────────
+# Book of Jasher (Josh 10:13; 2 Sam 1:18) — 文理和合: 雅煞珥紀
+雅煞珥紀
+# Book of the Wars of the LORD (Num 21:14) — 文理和合: 耶和華戰紀
+耶和華戰紀
+# Acts of Solomon (1 Kgs 11:41) — 文理和合: 所羅門紀
+所羅門紀
+# Chronicles of the Kings of Israel (1 Kgs 14:19 et al.) — 文理和合: 以色列列王紀
+以色列列王紀
+# Chronicles of the Kings of Judah (1 Kgs 14:29 et al.) — 文理和合: 猶大列王紀
+猶大列王紀
+# Book of the Kings of Judah and Israel (2 Chr 16:11 et al.) — two word-order variants
+猶大以色列列王紀
+以色列猶大列王紀
+# Midrash on the Book of Kings (2 Chr 24:27) — 文理和合: 列王紀傳
+列王紀傳
+# Book of Samuel the Seer (1 Chr 29:29) — 文理和合: 撒母耳書 (with preceding 先見)
+撒母耳書
+# Book of Nathan the Prophet (1 Chr 29:29; 2 Chr 9:29) — 文理和合: 拿單書
+拿單書
+# Book of Gad the Seer (1 Chr 29:29) — 文理和合: 迦得書
+迦得書
+# Book of Shemaiah + Visions of Iddo (2 Chr 12:15) — 文理和合: 史記 (generic annals form)
+# Laments for Josiah (2 Chr 35:25) — 文理和合: 哀歌書
+哀歌書
+# Epistle to/from Laodicea (Col 4:16) — 文理和合: 老底嘉之書
+老底嘉之書

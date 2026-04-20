@@ -1,60 +1,44 @@
+/**
+ * Renders Chinese verse text with three levels of annotation:
+ *
+ *  1. 書名線 (zigzag underline) — book/literary titles detected by trie.
+ *     These take HIGHEST priority and override sentinel marks in the same span.
+ *     e.g. "先知{{ul|以賽亞}}書" → the trie matches "以賽亞書" as a book name even
+ *     though "以賽亞" was sentinel-marked as a proper noun.
+ *
+ *  2. 專名線 (solid underline) — proper nouns marked {{ul|…}} by Wikisource.
+ *     Sentinel chars \uE001…\uE002 embedded by cleanWikiVerseText().
+ *
+ *  3. 地名線 (double underline) — place names marked {{du|…}} by Wikisource.
+ *     Sentinel chars \uE003…\uE004 embedded by cleanWikiVerseText().
+ *
+ * The trie data files (biblical-proper-nouns.txt / biblical-place-names.txt)
+ * are kept for reference but are not used in active rendering.
+ */
 import { Fragment, type ReactNode } from "react";
-import nounsRaw from "./data/biblical-proper-nouns.txt?raw";
+import bookNamesRaw from "./data/biblical-book-names.txt?raw";
 import { buildProperNounTrie } from "./properNounTrie";
+import { UL_OPEN, UL_CLOSE, DU_OPEN, DU_CLOSE } from "./parseWiki";
 
-const PROPER_NOUNS = Array.from(
-  new Set(
-    nounsRaw
-      .split(/\r?\n/)
-      .map((line) => line.replace(/#.*$/, "").trim())
-      .filter(Boolean),
-  ),
-);
+// ── Book-name trie ────────────────────────────────────────────────────────────
 
-const findLongestProperNoun = buildProperNounTrie(PROPER_NOUNS);
-
-export type ProperSeg = { k: "t"; v: string } | { k: "n"; v: string };
-
-const SEG_CACHE = new Map<string, ProperSeg[]>();
-const SEG_CACHE_CAP = 5000;
-
-function segmentToSegs(text: string): ProperSeg[] {
-  const hit = SEG_CACHE.get(text);
-  if (hit) {
-    SEG_CACHE.delete(text);
-    SEG_CACHE.set(text, hit);
-    return hit;
-  }
-
-  const segs: ProperSeg[] = [];
-  let i = 0;
-  while (i < text.length) {
-    const m = findLongestProperNoun(text, i);
-    if (m) {
-      segs.push({ k: "n", v: m });
-      i += m.length;
-      continue;
-    }
-    const ch = text[i];
-    const last = segs[segs.length - 1];
-    if (last?.k === "t") last.v += ch;
-    else segs.push({ k: "t", v: ch });
-    i += 1;
-  }
-
-  if (SEG_CACHE.size >= SEG_CACHE_CAP) {
-    SEG_CACHE.delete(SEG_CACHE.keys().next().value as string);
-  }
-  SEG_CACHE.set(text, segs);
-  return segs;
+function loadLines(raw: string): string[] {
+  return Array.from(
+    new Set(
+      raw
+        .split(/\r?\n/)
+        .map((line) => line.replace(/#.*$/, "").trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
-const BOOK_NAME_RE = /《([^》]*)》/g;
+const findBookName = buildProperNounTrie(loadLines(bookNamesRaw));
 
-// Split text into speech/non-speech segments using 曰 (speaker attribution) and ○ (paragraph break).
-// Text immediately after 曰 is speech (red); ○ resets back to non-speech.
-// startsInSpeech carries state from the previous verse for continuous multi-verse speeches.
+// ── Speech segmentation (曰 / ○) ─────────────────────────────────────────────
+
 type YueSeg = { text: string; red: boolean };
+
 function splitByYue(text: string, startsInSpeech = false): { segs: YueSeg[]; endsInSpeech: boolean } {
   const segs: YueSeg[] = [];
   let inSpeech = startsInSpeech;
@@ -77,11 +61,113 @@ function splitByYue(text: string, startsInSpeech = false): { segs: YueSeg[]; end
   return { segs, endsInSpeech: inSpeech };
 }
 
+// ── Core annotated-text renderer ──────────────────────────────────────────────
+
+const SENTINEL_RE = /[\uE001\uE002\uE003\uE004]/g;
+
 /**
- * Renders verse body with:
- *  - 書名線 (wavy underline) on book/literary titles marked with 《...》 — brackets stripped
- *  - 專名線 (solid underline) on proper nouns via longest-match dictionary
- *  - words-of-jesus coloring on speech segments after 曰 / before 曰 or ○ (when isRedLetterVerse)
+ * Renders a chunk of sentinel-annotated text into React nodes.
+ *
+ * Algorithm:
+ *  1. Build a "clean" string (sentinels stripped) and a sentinel→clean index map.
+ *  2. Run the book-name trie on the clean string; record (cleanStart, cleanEnd) spans.
+ *  3. Walk the sentinel string character by character:
+ *     a. If a book-name span starts at the current clean position → consume the
+ *        corresponding sentinel range and emit a <span.book-name>.
+ *     b. Else if char is UL_OPEN  → consume up to matching UL_CLOSE → <span.proper-noun>.
+ *     c. Else if char is DU_OPEN  → consume up to matching DU_CLOSE → <span.place-name>.
+ *     d. Else → accumulate plain text.
+ */
+function renderAnnotatedChunk(text: string, keyFn: () => string): ReactNode[] {
+  // ── Step 1: position map ─────────────────────────────────────────────────
+  const cleanChars: string[] = [];
+  const sentToClean = new Int32Array(text.length + 1);
+  for (let i = 0; i < text.length; i++) {
+    sentToClean[i] = cleanChars.length;
+    const ch = text[i];
+    if (ch !== UL_OPEN && ch !== UL_CLOSE && ch !== DU_OPEN && ch !== DU_CLOSE) {
+      cleanChars.push(ch);
+    }
+  }
+  sentToClean[text.length] = cleanChars.length;
+  const clean = cleanChars.join("");
+
+  // ── Step 2: book-name spans on clean text ────────────────────────────────
+  // Map cleanStart → { cleanEnd, name }
+  const bookAt = new Map<number, { end: number; name: string }>();
+  for (let j = 0; j < clean.length; ) {
+    const bm = findBookName(clean, j);
+    if (bm) {
+      bookAt.set(j, { end: j + bm.length, name: bm });
+      j += bm.length;
+    } else {
+      j++;
+    }
+  }
+
+  // ── Step 3: walk sentinel text ───────────────────────────────────────────
+  const result: ReactNode[] = [];
+  let plainBuf = "";
+  const flushPlain = () => {
+    if (plainBuf) { result.push(plainBuf); plainBuf = ""; }
+  };
+
+  let i = 0;
+  while (i < text.length) {
+    const cleanPos = sentToClean[i];
+    const ch = text[i];
+
+    // (a) Book name — highest priority; override any sentinel marks in the span.
+    const span = bookAt.get(cleanPos);
+    if (span && ch !== UL_CLOSE && ch !== DU_CLOSE) {
+      // Advance past all sentinel chars whose clean position is within the span.
+      let j = i;
+      while (j < text.length && sentToClean[j] < span.end) j++;
+      flushPlain();
+      result.push(<span className="book-name" key={keyFn()} translate="no">{span.name}</span>);
+      i = j;
+      continue;
+    }
+
+    // (b) Proper noun {{ul|…}}.
+    if (ch === UL_OPEN) {
+      const close = text.indexOf(UL_CLOSE, i + 1);
+      if (close !== -1) {
+        const name = text.slice(i + 1, close).replace(SENTINEL_RE, "");
+        flushPlain();
+        result.push(<span className="proper-noun" key={keyFn()} translate="no">{name}</span>);
+        i = close + 1;
+        continue;
+      }
+    }
+
+    // (c) Place name {{du|…}}.
+    if (ch === DU_OPEN) {
+      const close = text.indexOf(DU_CLOSE, i + 1);
+      if (close !== -1) {
+        const name = text.slice(i + 1, close).replace(SENTINEL_RE, "");
+        flushPlain();
+        result.push(<span className="place-name" key={keyFn()} translate="no">{name}</span>);
+        i = close + 1;
+        continue;
+      }
+    }
+
+    // (d) Stray sentinel (e.g. a UL_CLOSE whose UL_OPEN was consumed by a book name) — skip.
+    if (ch === UL_CLOSE || ch === DU_CLOSE) { i++; continue; }
+
+    // (e) Plain text.
+    plainBuf += ch;
+    i++;
+  }
+  flushPlain();
+  return result;
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Renders verse body with 書名線 / 專名線 / 地名線 and optional words-of-Jesus colouring.
  */
 export function renderZhWithProperNouns(
   text: string,
@@ -92,38 +178,13 @@ export function renderZhWithProperNouns(
   let keyIdx = 0;
   const k = () => `${verseKey}-${keyIdx++}`;
 
-  // Render a plain-text chunk applying book-name and proper-noun spans.
-  function renderChunkNodes(chunk: string): ReactNode[] {
-    const result: ReactNode[] = [];
-    BOOK_NAME_RE.lastIndex = 0;
-    let last = 0;
-    let m: RegExpExecArray | null;
-    while ((m = BOOK_NAME_RE.exec(chunk)) !== null) {
-      if (m.index > last) {
-        for (const s of segmentToSegs(chunk.slice(last, m.index))) {
-          if (s.k === "t") { if (s.v) result.push(s.v); }
-          else result.push(<span className="proper-noun" key={k()} translate="no">{s.v}</span>);
-        }
-      }
-      result.push(<span className="book-name" key={k()} translate="no">{m[1]}</span>);
-      last = m.index + m[0].length;
-    }
-    if (last < chunk.length) {
-      for (const s of segmentToSegs(chunk.slice(last))) {
-        if (s.k === "t") { if (s.v) result.push(s.v); }
-        else result.push(<span className="proper-noun" key={k()} translate="no">{s.v}</span>);
-      }
-    }
-    return result;
-  }
-
   const parts: ReactNode[] = [];
 
   if (isRedLetterVerse) {
     const { segs: yueSegs } = splitByYue(text, startsInSpeech);
     if (yueSegs.some((s) => s.red)) {
       for (const ySeg of yueSegs) {
-        const nodes = renderChunkNodes(ySeg.text);
+        const nodes = renderAnnotatedChunk(ySeg.text, k);
         if (ySeg.red) {
           parts.push(<span className="words-of-jesus" key={k()}>{nodes}</span>);
         } else {
@@ -131,11 +192,10 @@ export function renderZhWithProperNouns(
         }
       }
     } else {
-      // No 曰 found in this verse — no speech markup possible
-      for (const n of renderChunkNodes(text)) parts.push(n);
+      for (const n of renderAnnotatedChunk(text, k)) parts.push(n);
     }
   } else {
-    for (const n of renderChunkNodes(text)) parts.push(n);
+    for (const n of renderAnnotatedChunk(text, k)) parts.push(n);
   }
 
   if (parts.length === 0) return null;

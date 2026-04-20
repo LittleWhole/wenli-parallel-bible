@@ -1,0 +1,6 @@
+node_modules
+dist
+*.local
+.DS_Store
+# Microsoft SimKai copied from Windows (do not commit; redistribution is restricted).
+public/fonts/simkai.ttf

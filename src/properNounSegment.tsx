@@ -51,50 +51,89 @@ function segmentToSegs(text: string): ProperSeg[] {
 
 const BOOK_NAME_RE = /《([^》]*)》/g;
 
+// Split text into speech/non-speech segments using 曰 (speaker attribution) and ○ (paragraph break).
+// Text immediately after 曰 is speech (red); ○ resets back to non-speech.
+type YueSeg = { text: string; red: boolean };
+function splitByYue(text: string): YueSeg[] {
+  const segments: YueSeg[] = [];
+  let inSpeech = false;
+  let segStart = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "曰") {
+      if (i > segStart) segments.push({ text: text.slice(segStart, i), red: inSpeech });
+      segments.push({ text: "曰", red: false });
+      segStart = i + 1;
+      inSpeech = true;
+    } else if (ch === "○") {
+      if (i > segStart) segments.push({ text: text.slice(segStart, i), red: inSpeech });
+      segments.push({ text: "○", red: false });
+      segStart = i + 1;
+      inSpeech = false;
+    }
+  }
+  if (segStart < text.length) segments.push({ text: text.slice(segStart), red: inSpeech });
+  return segments;
+}
+
 /**
  * Renders verse body with:
- *  - 書名線 (wavy overline) on book/literary titles marked with 《...》 — brackets stripped
- *  - 專名線 (solid right-side line) on proper nouns via longest-match dictionary
+ *  - 書名線 (wavy underline) on book/literary titles marked with 《...》 — brackets stripped
+ *  - 專名線 (solid underline) on proper nouns via longest-match dictionary
+ *  - words-of-jesus coloring on speech segments after 曰 / before 曰 or ○ (when isRedLetterVerse)
  */
-export function renderZhWithProperNouns(text: string, verseKey: string): ReactNode {
-  // Split on 《...》 first so book titles get their own spans; apply proper noun
-  // detection only on the plain-text chunks in between.
-  type Chunk = { kind: "book"; v: string } | { kind: "text"; v: string };
-  const chunks: Chunk[] = [];
-  let last = 0;
-  BOOK_NAME_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = BOOK_NAME_RE.exec(text)) !== null) {
-    if (m.index > last) chunks.push({ kind: "text", v: text.slice(last, m.index) });
-    chunks.push({ kind: "book", v: m[1] });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) chunks.push({ kind: "text", v: text.slice(last) });
+export function renderZhWithProperNouns(
+  text: string,
+  verseKey: string,
+  isRedLetterVerse = false,
+): ReactNode {
+  let keyIdx = 0;
+  const k = () => `${verseKey}-${keyIdx++}`;
 
-  const parts: ReactNode[] = [];
-  let pn = 0;
-  let bn = 0;
-
-  for (const chunk of chunks) {
-    if (chunk.kind === "book") {
-      parts.push(
-        <span className="book-name" key={`${verseKey}-bn-${bn++}`} translate="no">
-          {chunk.v}
-        </span>,
-      );
-    } else {
-      for (const s of segmentToSegs(chunk.v)) {
-        if (s.k === "t") {
-          if (s.v) parts.push(s.v);
-        } else {
-          parts.push(
-            <span className="proper-noun" key={`${verseKey}-pn-${pn++}`} translate="no">
-              {s.v}
-            </span>,
-          );
+  // Render a plain-text chunk applying book-name and proper-noun spans.
+  function renderChunkNodes(chunk: string): ReactNode[] {
+    const result: ReactNode[] = [];
+    BOOK_NAME_RE.lastIndex = 0;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = BOOK_NAME_RE.exec(chunk)) !== null) {
+      if (m.index > last) {
+        for (const s of segmentToSegs(chunk.slice(last, m.index))) {
+          if (s.k === "t") { if (s.v) result.push(s.v); }
+          else result.push(<span className="proper-noun" key={k()} translate="no">{s.v}</span>);
         }
       }
+      result.push(<span className="book-name" key={k()} translate="no">{m[1]}</span>);
+      last = m.index + m[0].length;
     }
+    if (last < chunk.length) {
+      for (const s of segmentToSegs(chunk.slice(last))) {
+        if (s.k === "t") { if (s.v) result.push(s.v); }
+        else result.push(<span className="proper-noun" key={k()} translate="no">{s.v}</span>);
+      }
+    }
+    return result;
+  }
+
+  const parts: ReactNode[] = [];
+
+  if (isRedLetterVerse) {
+    const yueSegs = splitByYue(text);
+    if (yueSegs.some((s) => s.red)) {
+      for (const ySeg of yueSegs) {
+        const nodes = renderChunkNodes(ySeg.text);
+        if (ySeg.red) {
+          parts.push(<span className="words-of-jesus" key={k()}>{nodes}</span>);
+        } else {
+          for (const n of nodes) parts.push(n);
+        }
+      }
+    } else {
+      // No 曰 found in this verse — no speech markup possible
+      for (const n of renderChunkNodes(text)) parts.push(n);
+    }
+  } else {
+    for (const n of renderChunkNodes(text)) parts.push(n);
   }
 
   if (parts.length === 0) return null;

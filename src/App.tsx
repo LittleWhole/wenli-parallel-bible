@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BOLLS, WS_BOOKS } from "./constants";
+import redLetterRaw from "./data/red-letter-verses.json";
 import { fetchJson } from "./api";
 import { fetchExistingWsBookSet, fetchWikisourceWikitext } from "./wikisource";
 import { extractVersesForChapter, type WikiVerse } from "./parseWiki";
@@ -14,6 +15,38 @@ type BollsBook = { bookid: string; chapters?: number };
 
 const LOAD_DEBOUNCE_MS = 280;
 
+const redLetter = redLetterRaw as Record<string, Record<string, number[]>>;
+function isRedLetter(bookId: number, chapter: number, verse: number): boolean {
+  return redLetter[String(bookId)]?.[String(chapter)]?.includes(verse) ?? false;
+}
+
+const OPEN_QUOTE = "\u201C"; // "
+const CLOSE_QUOTE = "\u201D"; // "
+
+function renderEnRedLetter(text: string, startsInQuote = false) {
+  const parts: React.ReactNode[] = [];
+  let inQuote = startsInQuote;
+  let segStart = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === OPEN_QUOTE && !inQuote) {
+      if (i > segStart) parts.push(text.slice(segStart, i));
+      segStart = i;
+      inQuote = true;
+    } else if (text[i] === CLOSE_QUOTE && inQuote) {
+      parts.push(<span className="words-of-jesus" key={i}>{text.slice(segStart, i + 1)}</span>);
+      segStart = i + 1;
+      inQuote = false;
+    }
+  }
+  if (segStart < text.length) {
+    const tail = text.slice(segStart);
+    parts.push(inQuote ? <span className="words-of-jesus" key="tail">{tail}</span> : tail);
+  }
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0];
+  return <>{parts}</>;
+}
+
 export default function App() {
   const { fontId, setFontId, presets } = useChineseFont();
   const [scrollRevision, setScrollRevision] = useState(0);
@@ -23,6 +56,9 @@ export default function App() {
   const [bookId, setBookId] = useState(43);
   const [chapter, setChapter] = useState(3);
   const [nivEdition, setNivEdition] = useState("NIV2011");
+  const [redLetterOn, setRedLetterOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("bible-red-letter") !== "off"; } catch { return true; }
+  });
   const [zhVerses, setZhVerses] = useState<WikiVerse[]>([]);
   const [enVerses, setEnVerses] = useState<{ verse: number; text: string }[]>([]);
   const [zhRefLine, setZhRefLine] = useState("");
@@ -31,6 +67,26 @@ export default function App() {
   const [enStatus, setEnStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [hoveredVerse, setHoveredVerse] = useState<number | null>(null);
+
+  // Pre-process English verses: strip HTML and carry open-quote state across consecutive
+  // red-letter verses so multi-verse speeches stay highlighted end-to-end.
+  const processedEnVerses = useMemo(() => {
+    let inQuote = false;
+    return enVerses.map((v) => {
+      const text = stripHtml(v.text);
+      const red = isRedLetter(bookId, chapter, v.verse);
+      if (!red) {
+        inQuote = false; // non-red-letter verse breaks continuity
+        return { verse: v.verse, text, startsInQuote: false };
+      }
+      const startsInQuote = inQuote;
+      for (const ch of text) {
+        if (ch === OPEN_QUOTE && !inQuote) inQuote = true;
+        else if (ch === CLOSE_QUOTE && inQuote) inQuote = false;
+      }
+      return { verse: v.verse, text, startsInQuote };
+    });
+  }, [enVerses, bookId, chapter]);
 
   const loadGeneration = useRef(0);
   const flightRef = useRef<AbortController | null>(null);
@@ -189,6 +245,21 @@ export default function App() {
                 <option value="NIV">1984</option>
               </select>
             </div>
+            <button
+              type="button"
+              className={`btn-toggle${redLetterOn ? " is-on" : ""}`}
+              aria-pressed={redLetterOn}
+              onClick={() =>
+                setRedLetterOn((v) => {
+                  const next = !v;
+                  try { localStorage.setItem("bible-red-letter", next ? "on" : "off"); } catch {}
+                  return next;
+                })
+              }
+              title="Toggle red-letter (words of Jesus)"
+            >
+              Red letter
+            </button>
             <div className="setting-inline">
               <label htmlFor="zh-font">字體</label>
               <select
@@ -241,6 +312,7 @@ export default function App() {
           status={zhStatus}
           hoveredVerse={hoveredVerse}
           onVerseHover={setHoveredVerse}
+          redLetterVerses={redLetterOn ? new Set(redLetter[String(bookId)]?.[String(chapter)] ?? []) : new Set()}
         />
 
         <section className="pane" aria-labelledby="en-title">
@@ -252,14 +324,17 @@ export default function App() {
           </div>
           <div ref={enScrollRef} className="pane-scroll-en" role="region" aria-label="NIV scroll area">
             <div className="niv-verses" aria-label="NIV text">
-              {enVerses.map((v) => (
+              {processedEnVerses.map((v) => (
                 <p
                   key={v.verse}
                   className={`niv-verse${hoveredVerse === v.verse ? " is-hovered" : ""}`}
                   onMouseEnter={() => setHoveredVerse(v.verse)}
                   onMouseLeave={() => setHoveredVerse(null)}
                 >
-                  <span className="verse-num">{v.verse}</span> {stripHtml(v.text)}
+                  <span className="verse-num">{v.verse}</span>{" "}
+                  {redLetterOn && isRedLetter(bookId, chapter, v.verse)
+                    ? renderEnRedLetter(v.text, v.startsInQuote)
+                    : v.text}
                 </p>
               ))}
             </div>

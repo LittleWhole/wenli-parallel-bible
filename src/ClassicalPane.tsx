@@ -9,6 +9,7 @@ type Props = {
   status: string;
   hoveredVerse: number | null;
   onVerseHover: (verse: number | null) => void;
+  redLetterVerses: Set<number>;
 };
 
 /** DOM order reversed so `flex-direction: row` still puts verse 1 on the right (traditional column order). */
@@ -16,7 +17,7 @@ function displayVerses(verses: WikiVerse[]) {
   return verses.length ? [...verses].reverse() : [];
 }
 
-export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredVerse, onVerseHover }: Props) {
+export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredVerse, onVerseHover, redLetterVerses }: Props) {
   const cols = displayVerses(verses);
 
   return (
@@ -43,7 +44,11 @@ export function ClassicalPane({ horizontalRef, verses, refLine, status, hoveredV
                 onMouseLeave={() => onVerseHover(null)}
               >
                 <span className="verse-num">{v.verse}</span>
-                <ZhVerseBody text={v.text} verseKey={String(v.verse)} />
+                <ZhVerseBody
+                  text={v.text}
+                  verseKey={String(v.verse)}
+                  isRedLetterVerse={redLetterVerses.has(verseNum)}
+                />
               </div>
             );
           })}

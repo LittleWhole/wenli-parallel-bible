@@ -13,10 +13,17 @@ import { fetchJaWikisourceWikitext } from "./jaWikisource";
 import { fetchExistingWsBookSet, fetchWikisourceWikitext } from "./wikisource";
 import { extractVersesForChapter, type WikiVerse } from "./parseWiki";
 import { cleanMeijiVerseText } from "./parseMeiji";
+import { extractMeijiGenesisChapter } from "./meijiOt";
 import { meijiJaBookTitle } from "./meijiBooks";
 import { extractTaisho4NtChapterFromBooks } from "./parseTaisho4";
 import { taisho4NtPageTitles } from "./taisho4Nt";
-import { loadZhSource, persistZhSource, ZH_SOURCE_LABEL, type ZhSource } from "./zhSource";
+import {
+  loadZhSource,
+  meijiIsNewTestament,
+  persistZhSource,
+  ZH_SOURCE_LABEL,
+  type ZhSource,
+} from "./zhSource";
 import { stripHtml } from "./strings";
 import { useChineseFont } from "./useChineseFont";
 import { useParallelScroll } from "./useParallelScroll";
@@ -287,7 +294,7 @@ export default function App() {
       } else {
         const jaBase = meijiJaBookTitle(bookId);
         if (!jaBase) throw new Error("Unknown book for Meiji source.");
-        if (bookId >= 40) {
+        if (meijiIsNewTestament(bookId)) {
           const pages = taisho4NtPageTitles(bookId);
           if (!pages?.length) throw new Error(`Meiji (Taisho 4 New Testament): Unknown book (bookId ${bookId}). 明治元譯（大正四年新約）：未登録の書（bookId ${bookId}）です。`);
           let concat = "";
@@ -297,6 +304,10 @@ export default function App() {
             concat += r.wikitext + "\n";
           }
           zh = extractTaisho4NtChapterFromBooks(concat, ch);
+        } else if (bookId === 1) {
+          const r = await extractMeijiGenesisChapter(ch, signal);
+          zh = r.verses;
+          zhPageTitle = r.title;
         } else {
           const { wikitext, title } = await fetchJaWikisourceWikitext(jaBase, signal);
           zhPageTitle = title;
@@ -309,10 +320,16 @@ export default function App() {
       if (signal.aborted || myGen !== loadGeneration.current) return;
 
       if (!zh.length) {
+        const meijiEmpty =
+          zhSource === "meiji" && meijiIsNewTestament(bookId)
+            ? `明治元譯（新約 · 大正四年）此卷未解析到節文（頁面「${zhPageTitle}」）。 Meiji New Testament (Taisho 4): chapter ${ch} not parsed (page "${zhPageTitle}").`
+            : zhSource === "meiji"
+              ? `明治元譯（舊約 · 文語訳）此卷未解析到節文（頁面「${zhPageTitle}」）。 Meiji Old Testament (bungo): chapter ${ch} not parsed (page "${zhPageTitle}").`
+              : "";
         throw new Error(
           zhSource === "wenli"
             ? `維基文庫此卷未解析到第 ${ch} 節（頁面「${zhPageTitle}」）。請確認該章存在，或章節標記與源文一致。 Wikisource chapter ${ch} not parsed (page "${zhPageTitle}"). Please check if the chapter exists, or the chapter markers match the source text.`
-            : `明治元譯此卷未解析到節文（頁面「${zhPageTitle}」）。 Meiji (Taisho 4 New Testament): Chapter ${ch} not parsed (page "${zhPageTitle}").`,
+            : meijiEmpty,
         );
       }
 
@@ -486,6 +503,7 @@ export default function App() {
           redLetterVerses={redLetterOn ? new Set(redLetter[String(bookId)]?.[String(chapter)] ?? []) : new Set()}
           englishFullyRedVerses={englishFullyRedVerses}
           zhSource={zhSource}
+          bookId={bookId}
         />
 
         <section className="pane" aria-labelledby="en-title">

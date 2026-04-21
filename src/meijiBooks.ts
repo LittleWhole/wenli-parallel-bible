@@ -1,6 +1,9 @@
 /**
- * Exact Japanese Wikisource basenames for the Meiji-era Bible:
- * OT = 文語訳 (明治元訳旧約聖書 index), NT = 明治元譯 (明治元訳新約聖書 (明治37年) index).
+ * Exact Japanese Wikisource page titles for the Meiji-era Bible:
+ * OT = standalone `…(文語訳)` pages listed under
+ * {@link https://ja.wikisource.org/wiki/明治元訳旧約聖書 明治元訳旧約聖書}
+ * (Genesis also uses the first two `…(文語訳ルビ付)` parts — see {@link meijiOt.ts}).
+ * NT is loaded from Taisho 4 pages in {@link taisho4Nt.ts}.
  * Book order matches {@link WS_BOOKS} ids 1–66.
  */
 export const MEIJI_JA_BOOK_TITLE: readonly string[] = [

@@ -1,4 +1,5 @@
 import { Fragment, useMemo, type ReactNode } from "react";
+import { splitByJapaneseJesus } from "./jaJesusSpeech";
 import { RUBY_END, RUBY_MID, RUBY_OPEN } from "./parseMeiji";
 import { DU_CLOSE, DU_OPEN, UL_CLOSE, UL_OPEN } from "./parseWiki";
 
@@ -38,6 +39,8 @@ function renderMeijiInner(text: string, keyFn: () => string): ReactNode[] {
         i = e + 1;
         continue;
       }
+      i++;
+      continue;
     }
     if (ch === UL_OPEN) {
       const close = text.indexOf(UL_CLOSE, i + 1);
@@ -73,6 +76,11 @@ function renderMeijiInner(text: string, keyFn: () => string): ReactNode[] {
       i++;
       continue;
     }
+    /* Orphan furigana sentinels (e.g. speech split mid-{{ruby}}) — U+E021 is RUBY_MID */
+    if (ch === RUBY_MID || ch === RUBY_END) {
+      i++;
+      continue;
+    }
     buf += ch;
     i += 1;
   }
@@ -83,25 +91,59 @@ function renderMeijiInner(text: string, keyFn: () => string): ReactNode[] {
 type Props = {
   text: string;
   verseKey: string;
-  /** Same red-letter overlay as 文理 (words of Jesus). */
-  wrapWordsOfJesus?: boolean;
+  /** Verse is red-letter in English (candidate for イエス… discourse colouring). */
+  isRedLetterVerse?: boolean;
+  /** Speech continues from the previous verse (closing bracket not yet seen). */
+  startsInSpeech?: boolean;
+  /** English is fully red; if no discourse match, colour the whole verse like 文理. */
+  forceFullVerseRed?: boolean;
 };
 
-/** Furigana-capable Meiji / Taisho 4 text with 專名 (single rule) and 地名 (double rule). */
-export function MeijiVerseBody({ text, verseKey, wrapWordsOfJesus = false }: Props) {
+/** Furigana-capable Meiji / Taisho 4 text with 專名 / 地名 and イエス…-style red speech. */
+export function MeijiVerseBody({
+  text,
+  verseKey,
+  isRedLetterVerse = false,
+  startsInSpeech = false,
+  forceFullVerseRed = false,
+}: Props) {
   return useMemo(() => {
     let k = 0;
     const keyFn = () => `${verseKey}-${k++}`;
-    const nodes = renderMeijiInner(text, keyFn);
-    if (nodes.length === 0) return null;
-    const inner = wrapNodes(nodes);
-    if (wrapWordsOfJesus) {
+    const renderInner = (t: string) => wrapNodes(renderMeijiInner(t, keyFn));
+
+    if (!isRedLetterVerse) {
+      return <span translate="no">{renderInner(text)}</span>;
+    }
+
+    const { segs } = splitByJapaneseJesus(text, startsInSpeech);
+    const hasJesusSpeech = segs.some((s) => s.red);
+    if (forceFullVerseRed && !hasJesusSpeech) {
       return (
         <span className="words-of-jesus" translate="no">
-          {inner}
+          {renderInner(text)}
         </span>
       );
     }
-    return <span translate="no">{inner}</span>;
-  }, [text, verseKey, wrapWordsOfJesus]);
+    if (!hasJesusSpeech) {
+      return <span translate="no">{renderInner(text)}</span>;
+    }
+
+    const parts: ReactNode[] = [];
+    for (const ySeg of segs) {
+      const inner = renderInner(ySeg.text);
+      if (ySeg.red) {
+        parts.push(
+          <span className="words-of-jesus" key={keyFn()} translate="no">
+            {inner}
+          </span>,
+        );
+      } else {
+        parts.push(<Fragment key={keyFn()}>{inner}</Fragment>);
+      }
+    }
+    if (parts.length === 0) return null;
+    if (parts.length === 1) return parts[0];
+    return <Fragment>{parts}</Fragment>;
+  }, [text, verseKey, isRedLetterVerse, startsInSpeech, forceFullVerseRed]);
 }

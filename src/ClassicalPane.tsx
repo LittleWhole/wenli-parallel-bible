@@ -1,9 +1,10 @@
 import { useMemo, type RefObject } from "react";
 import type { WikiVerse } from "./parseWiki";
+import { jaVerseHasJesusSpeech, splitByJapaneseJesus } from "./jaJesusSpeech";
 import { zhVerseHasYueRedSpeech } from "./properNounSegment";
 import { ZhVerseBody } from "./ZhVerseBody";
 import { MeijiVerseBody } from "./MeijiVerseBody";
-import type { ZhSource } from "./zhSource";
+import { meijiClassicalPaneTitle, meijiIsNewTestament, type ZhSource } from "./zhSource";
 
 type Props = {
   horizontalRef: RefObject<HTMLDivElement | null>;
@@ -16,6 +17,8 @@ type Props = {
   /** English verse is 100% red-letter; enables full-verse 文言 red when 曰/○ do not open speech. */
   englishFullyRedVerses: Set<number>;
   zhSource: ZhSource;
+  /** Used to show 舊約 vs 新約 Meiji Wikisource when zhSource is meiji. */
+  bookId: number;
 };
 
 /** DOM order reversed so `flex-direction: row` still puts verse 1 on the right (traditional column order). */
@@ -33,16 +36,15 @@ export function ClassicalPane({
   redLetterVerses,
   englishFullyRedVerses,
   zhSource,
+  bookId,
 }: Props) {
   const cols = displayVerses(verses);
 
-  // Pre-compute per-verse speech start state (carries 曰/○ state across consecutive red-letter verses).
-  // When English is 100% red-letter but 曰/○ never produce red text here, we force full-verse red and do
-  // not carry 曰/○ state onward (next verse is black unless it has its own red). If 曰/○ do produce red,
-  // carry behaves as usual. (Meiji Japanese text does not use this path.)
+  // Pre-compute per-verse speech start state (曰/○ for 文理; イエス…/「」 for 明治).
+  // When English is 100% red-letter but no discourse red segments appear, we force full-verse red and do
+  // not carry speech state onward. If discourse rules do produce red, carry behaves as usual.
   const speechStateMap = useMemo(() => {
     const map = new Map<number, boolean>();
-    if (zhSource === "meiji") return map;
     let inSpeech = false;
     for (const v of verses) {
       const verseNum = parseInt(String(v.verse), 10);
@@ -53,25 +55,46 @@ export function ClassicalPane({
       }
       map.set(verseNum, inSpeech);
       const blockCarry =
-        englishFullyRedVerses.has(verseNum) && !zhVerseHasYueRedSpeech(v.text, inSpeech);
+        englishFullyRedVerses.has(verseNum) &&
+        (zhSource === "meiji"
+          ? !jaVerseHasJesusSpeech(v.text, inSpeech)
+          : !zhVerseHasYueRedSpeech(v.text, inSpeech));
       if (blockCarry) {
         inSpeech = false;
         continue;
       }
-      for (const ch of v.text) {
-        if (ch === "曰") inSpeech = true;
-        else if (ch === "○") inSpeech = false;
+      if (zhSource === "meiji") {
+        inSpeech = splitByJapaneseJesus(v.text, inSpeech).endsInSpeech;
+      } else {
+        for (const ch of v.text) {
+          if (ch === "曰") inSpeech = true;
+          else if (ch === "○") inSpeech = false;
+        }
       }
     }
     return map;
   }, [verses, redLetterVerses, englishFullyRedVerses, zhSource]);
 
-  const paneTitle = zhSource === "meiji" ? "明治元譯（文語）" : "文理和合譯本";
-  const paneScrollLabel = zhSource === "meiji" ? "Japanese classical Bible scroll area" : "Classical Chinese scroll area";
-  const paneTextLabel = zhSource === "meiji" ? "Meiji Bible text with furigana" : "Classical Chinese text";
+  const paneTitle = zhSource === "meiji" ? meijiClassicalPaneTitle(bookId) : "文理和合譯本";
+  const paneScrollLabel =
+    zhSource === "meiji"
+      ? meijiIsNewTestament(bookId)
+        ? "Japanese Bible scroll area (Meiji New Testament, Taisho 4)"
+        : "Japanese Bible scroll area (Meiji Old Testament, bungo)"
+      : "Classical Chinese scroll area";
+  const paneTextLabel =
+    zhSource === "meiji"
+      ? meijiIsNewTestament(bookId)
+        ? "Meiji New Testament text with furigana"
+        : "Meiji Old Testament text with furigana"
+      : "Classical Chinese text";
 
   return (
-    <section className="pane classical-pane" aria-labelledby="zh-title">
+    <section
+      className="pane classical-pane"
+      lang={zhSource === "meiji" ? "ja" : "zh-Hant"}
+      aria-labelledby="zh-title"
+    >
       <div className="pane-head">
         <h2 id="zh-title">{paneTitle}</h2>
         <div className="ref-line" aria-live="polite">
@@ -98,9 +121,9 @@ export function ClassicalPane({
                   <MeijiVerseBody
                     text={v.text}
                     verseKey={String(v.verse)}
-                    wrapWordsOfJesus={
-                      redLetterVerses.has(verseNum) && englishFullyRedVerses.has(verseNum)
-                    }
+                    isRedLetterVerse={redLetterVerses.has(verseNum)}
+                    startsInSpeech={speechStateMap.get(verseNum) ?? false}
+                    forceFullVerseRed={englishFullyRedVerses.has(verseNum)}
                   />
                 ) : (
                   <ZhVerseBody

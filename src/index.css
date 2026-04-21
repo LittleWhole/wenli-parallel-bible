@@ -990,6 +990,35 @@ body {
   font-family: var(--wy-book-font);
 }
 
+/*
+ * Meiji column: CJK font presets (QIJI、華文楷體, etc.) often lack historical kana / くの字点 / full
+ * hiragana coverage — browser shows □. Use Japanese system / CJK-JP fonts first when lang=ja.
+ */
+.classical-pane:lang(ja) {
+  font-family:
+    "Hiragino Mincho ProN",
+    "Hiragino Mincho Pro",
+    "Hiragino Sans",
+    "Yu Mincho",
+    "YuMincho",
+    "Yu Gothic",
+    "Noto Serif CJK JP",
+    "Noto Sans CJK JP",
+    "Source Han Serif",
+    "Source Han Sans",
+    "IPAex Mincho",
+    "IPAmjMincho",
+    "TakaoMincho",
+    "TakaoExMincho",
+    "MS Mincho",
+    "MS PMincho",
+    "MS Gothic",
+    "Meiryo",
+    "Segoe UI Symbol",
+    ui-serif,
+    serif;
+}
+
 @media (max-width: 900px) {
   .classical-pane {
     border-right: none;
@@ -1098,6 +1127,14 @@ body {
 .verse-col.verse-col--ja .proper-noun,
 .verse-col.verse-col--ja .place-name {
   text-underline-position: right;
+}
+
+/* Tiny gap between consecutive 專名／地名 so underlines don’t merge into one band */
+.verse-col .proper-noun + .proper-noun,
+.verse-col .place-name + .place-name,
+.verse-col .proper-noun + .place-name,
+.verse-col .place-name + .proper-noun {
+  margin-inline-start: 0.12em;
 }
 
 /*

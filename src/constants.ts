@@ -89,20 +89,33 @@ export type ZhFontPreset = {
 
 export const CHINESE_FONT_PRESETS: ZhFontPreset[] = [
   {
+    id: "system-serif",
+    label: "系統 Serif（本機字體）",
+    cssStack: "serif",
+    sheets: [],
+  },
+  {
+    id: "system-kai",
+    label: "系統楷／華康（本機字體）",
+    cssStack:
+      '"Kaiti TC", "Kaiti SC", "Kaiti HK", "BiauKai", "標楷體", "KaiTi", "STKaiti", "DFKai-SB", "Songti TC", serif',
+    sheets: [],
+  },
+  {
     id: "qiji",
-    label: "齊伋體 QIJI（文言書 book.wy-lang.org）",
+    label: "齊伋體 QIJI",
     cssStack: "QIJI, serif",
     sheets: [],
   },
   {
     id: "stkaiti",
-    label: "華文楷體 STKaiti（macOS 選裝；可複製到 public/fonts/stkaiti.ttf）",
+    label: "華文楷體 STKaiti",
     cssStack: '"STKaiti Web", "STKaiti", "华文楷体", "Kaiti TC", "Kaiti SC", "KaiTi", "楷体", serif',
     sheets: [],
   },
   {
     id: "lxgw-wenkai",
-    label: "霞鹜文楷 LXGW WenKai（刻本楷）",
+    label: "霞鹜文楷 LXGW WenKai",
     cssStack: '"LXGW WenKai", "Kaiti TC", "KaiTi", serif',
     sheets: ["https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css"],
   },
@@ -120,7 +133,7 @@ export const CHINESE_FONT_PRESETS: ZhFontPreset[] = [
   },
   {
     id: "zen-old-mincho",
-    label: "Zen Old Mincho（日本舊明朝）",
+    label: "Zen Old Mincho",
     cssStack: '"Zen Old Mincho", "Noto Serif TC", serif',
     sheets: [],
   },
@@ -165,12 +178,5 @@ export const CHINESE_FONT_PRESETS: ZhFontPreset[] = [
     label: "隆行草書體 Long Cang",
     cssStack: '"Long Cang", "Kaiti TC", serif',
     sheets: [],
-  },
-  {
-    id: "system-kai",
-    label: "系統楷／華康（本機字體）",
-    cssStack:
-      '"Kaiti TC", "Kaiti SC", "Kaiti HK", "BiauKai", "標楷體", "KaiTi", "STKaiti", "DFKai-SB", "Songti TC", serif',
-    sheets: [],
-  },
+  }
 ];

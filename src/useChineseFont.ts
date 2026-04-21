@@ -21,7 +21,7 @@ export function useChineseFont() {
     } catch {
       /* ignore */
     }
-    return "qiji";
+    return "system-kai";
   });
 
   const applyPreset = useCallback((preset: ZhFontPreset) => {

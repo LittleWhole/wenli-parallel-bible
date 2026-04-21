@@ -21,6 +21,6 @@ export function persistZhSource(s: ZhSource) {
 }
 
 export const ZH_SOURCE_LABEL: Record<ZhSource, string> = {
-  wenli: "文理和合（維基文庫）",
-  meiji: "明治元譯（日語 WikiSource・新約大正四年／振假名）",
+  wenli: "文理和合 Wenli Union",
+  meiji: "明治元譯（新約大正四年）Meiji Genyaku (Taisho 4 New Testament)",
 };

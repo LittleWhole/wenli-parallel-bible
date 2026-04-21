@@ -223,8 +223,8 @@ export default function App() {
         if (!opts.length) {
           throw new Error(
             zhSource === "wenli"
-              ? "維基文庫上找不到《聖經 (文理和合)》任何子頁；請稍後再試。"
-              : "無法從 Bolls 取得書卷列表。",
+              ? "維基文庫上找不到《聖經 (文理和合)》任何子頁；請稍後再試。 Cound not find any subpages of the Bible (Wenli Union) on Wikisource; please try again later."
+              : "Could not get book list from Bolls. 無法從 Bolls 取得書卷列表。",
           );
         }
         setBookOptions(opts);
@@ -289,7 +289,7 @@ export default function App() {
         if (!jaBase) throw new Error("Unknown book for Meiji source.");
         if (bookId >= 40) {
           const pages = taisho4NtPageTitles(bookId);
-          if (!pages?.length) throw new Error(`明治元譯（大正四年新約）：未登録の書です（bookId ${bookId}）。`);
+          if (!pages?.length) throw new Error(`Meiji (Taisho 4 New Testament): Unknown book (bookId ${bookId}). 明治元譯（大正四年新約）：未登録の書（bookId ${bookId}）です。`);
           let concat = "";
           for (let pi = 0; pi < pages.length; pi++) {
             const r = await fetchJaWikisourceWikitext(pages[pi]!, signal);
@@ -311,8 +311,8 @@ export default function App() {
       if (!zh.length) {
         throw new Error(
           zhSource === "wenli"
-            ? `維基文庫此卷未解析到第 ${ch} 節（頁面「${zhPageTitle}」）。請確認該章存在，或章節標記與源文一致。`
-            : `明治元譯此卷未解析到節文（頁面「${zhPageTitle}」）。`,
+            ? `維基文庫此卷未解析到第 ${ch} 節（頁面「${zhPageTitle}」）。請確認該章存在，或章節標記與源文一致。 Wikisource chapter ${ch} not parsed (page "${zhPageTitle}"). Please check if the chapter exists, or the chapter markers match the source text.`
+            : `明治元譯此卷未解析到節文（頁面「${zhPageTitle}」）。 Meiji (Taisho 4 New Testament): Chapter ${ch} not parsed (page "${zhPageTitle}").`,
         );
       }
 
@@ -419,7 +419,7 @@ export default function App() {
               <span className="btn-theme-text">{darkMode ? "Light" : "Dark"}</span>
             </button>
             <div className="setting-inline setting-zh-source">
-              <label htmlFor="zh-source">中文欄</label>
+              <label htmlFor="zh-source">CJK source</label>
               <select
                 id="zh-source"
                 className="select-compact select-zh-source"
@@ -432,7 +432,7 @@ export default function App() {
               </select>
             </div>
             <div className="setting-inline">
-              <label htmlFor="zh-font">字體</label>
+              <label htmlFor="zh-font">CJK Font</label>
               <select
                 id="zh-font"
                 className="select-compact select-zh-font"

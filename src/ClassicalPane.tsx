@@ -53,8 +53,14 @@ export function ClassicalPane({
     for (const v of verses) {
       const verseNum = parseInt(String(v.verse), 10);
       if (!redLetterVerses.has(verseNum)) {
-        inSpeech = false;
         map.set(verseNum, false);
+        // 國漢文: advance 「…」 depth through narrative verses so a closing 」 in a
+        // non–red-letter verse updates carry (resetting blindly mis-highlights later verses).
+        if (zhSource === "koreanHan") {
+          inSpeech = cornerQuoteEndsInSpeech(v.text, inSpeech);
+        } else {
+          inSpeech = false;
+        }
         continue;
       }
       map.set(verseNum, inSpeech);

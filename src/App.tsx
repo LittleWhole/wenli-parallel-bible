@@ -36,6 +36,8 @@ import { useParallelScroll } from "./useParallelScroll";
 import { ClassicalPane } from "./ClassicalPane";
 import { PassagePicker, type BookRow } from "./PassagePicker";
 import { SourcesDialog } from "./SourcesDialog";
+import { MoreMenuDialog } from "./MoreMenuDialog";
+import { useMobileLayout } from "./useMobileLayout";
 import "./index.css";
 
 type BollsBook = { bookid: string; chapters?: number };
@@ -96,6 +98,8 @@ function enVerseIsEntirelyRedLetter(text: string, startsInQuote: boolean): boole
 }
 
 export default function App() {
+  const isMobileLayout = useMobileLayout();
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const { fontId, setFontId, presets } = useChineseFont();
   const [scrollRevision, setScrollRevision] = useState(0);
   const { enScrollRef, zhHorizontalRef } = useParallelScroll(scrollRevision);
@@ -399,117 +403,119 @@ export default function App() {
   }, [runLoad, clearDebounceTimer]);
 
   return (
-    <div className="app-root">
+    <div className={`app-root${isMobileLayout ? " app-root--mobile" : ""}`}>
       <header className="app-header">
-        <div className="header-toolbar">
-          <h1>Parallel Bible</h1>
-          <div className="header-settings">
-            <div className="setting-inline setting-en-translation">
-              <label htmlFor="en-translation">English</label>
-              <select
-                id="en-translation"
-                className="select-compact select-en-translation"
-                aria-label="English Bible translation"
-                value={enTranslation}
-                disabled={enTranslations.length === 0}
-                onChange={(e) => setEnTranslation(e.target.value)}
-              >
-                {enTranslations.length === 0 ? (
-                  <option value={enTranslation}>{enTranslation}</option>
-                ) : (
-                  enTranslations.map((t) => (
-                    <option key={t.short_name} value={t.short_name} title={t.full_name}>
-                      {t.short_name} — {t.full_name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-            <button
-              type="button"
-              className={`btn-toggle${redLetterOn ? " is-on" : ""}`}
-              aria-pressed={redLetterOn}
-              onClick={() =>
-                setRedLetterOn((v) => {
-                  const next = !v;
-                  try { localStorage.setItem("bible-red-letter", next ? "on" : "off"); } catch {}
-                  return next;
-                })
-              }
-              title="Toggle red-letter (words of Jesus)"
-            >
-              Red letter
-            </button>
-            <button
-              type="button"
-              className={`btn-theme${darkMode ? " is-dark" : ""}`}
-              aria-pressed={darkMode}
-              onClick={() => setDarkMode((v) => !v)}
-              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              <span className="btn-theme-icon" aria-hidden>
-                {darkMode ? "☀" : "☽"}
+        {!isMobileLayout ? (
+          <div className="header-toolbar">
+              <h1>Parallel Bible</h1>
+              <div className="header-settings">
+                <div className="setting-inline setting-en-translation">
+                  <label htmlFor="en-translation">English</label>
+                  <select
+                    id="en-translation"
+                    className="select-compact select-en-translation"
+                    aria-label="English Bible translation"
+                    value={enTranslation}
+                    disabled={enTranslations.length === 0}
+                    onChange={(e) => setEnTranslation(e.target.value)}
+                  >
+                    {enTranslations.length === 0 ? (
+                      <option value={enTranslation}>{enTranslation}</option>
+                    ) : (
+                      enTranslations.map((t) => (
+                        <option key={t.short_name} value={t.short_name} title={t.full_name}>
+                          {t.short_name} — {t.full_name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className={`btn-toggle${redLetterOn ? " is-on" : ""}`}
+                  aria-pressed={redLetterOn}
+                  onClick={() =>
+                    setRedLetterOn((v) => {
+                      const next = !v;
+                      try { localStorage.setItem("bible-red-letter", next ? "on" : "off"); } catch {}
+                      return next;
+                    })
+                  }
+                  title="Toggle red-letter (words of Jesus)"
+                >
+                  Red letter
+                </button>
+                <button
+                  type="button"
+                  className={`btn-theme${darkMode ? " is-dark" : ""}`}
+                  aria-pressed={darkMode}
+                  onClick={() => setDarkMode((v) => !v)}
+                  title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  <span className="btn-theme-icon" aria-hidden>
+                    {darkMode ? "☀" : "☽"}
+                  </span>
+                  <span className="btn-theme-text">{darkMode ? "Light" : "Dark"}</span>
+                </button>
+                <div className="setting-inline setting-zh-source">
+                  <label htmlFor="zh-source">CJK source</label>
+                  <select
+                    id="zh-source"
+                    className="select-compact select-zh-source"
+                    aria-label="Parallel column Bible text"
+                    value={zhSource}
+                    onChange={(e) => setZhSource(e.target.value as ZhSource)}
+                  >
+                    <option value="wenli">{ZH_SOURCE_LABEL.wenli}</option>
+                    <option value="koreanHan">{ZH_SOURCE_LABEL.koreanHan}</option>
+                    <option value="meiji">{ZH_SOURCE_LABEL.meiji}</option>
+                  </select>
+                </div>
+                <div className="setting-inline">
+                  <label htmlFor="zh-font">CJK Font</label>
+                  <select
+                    id="zh-font"
+                    className="select-compact select-zh-font"
+                    aria-label="Chinese column font"
+                    value={fontId}
+                    onChange={(e) => setFontId(e.target.value)}
+                  >
+                    {presets.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="btn-refresh"
+                  onClick={forceReload}
+                  disabled={loading}
+                  title="Reload passage"
+                >
+                  Reload
+                </button>
+              </div>
+              <span className={`load-indicator ${loading ? "is-loading" : ""}`} aria-live="polite">
+                {loading ? "…" : ""}
               </span>
-              <span className="btn-theme-text">{darkMode ? "Light" : "Dark"}</span>
-            </button>
-            <div className="setting-inline setting-zh-source">
-              <label htmlFor="zh-source">CJK source</label>
-              <select
-                id="zh-source"
-                className="select-compact select-zh-source"
-                aria-label="Parallel column Bible text"
-                value={zhSource}
-                onChange={(e) => setZhSource(e.target.value as ZhSource)}
+              <button
+                type="button"
+                className="btn-sources-icon"
+                onClick={() => setSourcesOpen(true)}
+                title="Sources"
+                aria-label="Sources and attribution"
               >
-                <option value="wenli">{ZH_SOURCE_LABEL.wenli}</option>
-                <option value="koreanHan">{ZH_SOURCE_LABEL.koreanHan}</option>
-                <option value="meiji">{ZH_SOURCE_LABEL.meiji}</option>
-              </select>
-            </div>
-            <div className="setting-inline">
-              <label htmlFor="zh-font">CJK Font</label>
-              <select
-                id="zh-font"
-                className="select-compact select-zh-font"
-                aria-label="Chinese column font"
-                value={fontId}
-                onChange={(e) => setFontId(e.target.value)}
-              >
-                {presets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="button"
-              className="btn-refresh"
-              onClick={forceReload}
-              disabled={loading}
-              title="Reload passage"
-            >
-              Reload
-            </button>
+                <svg className="btn-sources-icon__svg" viewBox="0 0 24 24" width="12" height="12" aria-hidden>
+                  <path
+                    fill="currentColor"
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+                  />
+                </svg>
+              </button>
           </div>
-          <span className={`load-indicator ${loading ? "is-loading" : ""}`} aria-live="polite">
-            {loading ? "…" : ""}
-          </span>
-          <button
-            type="button"
-            className="btn-sources-icon"
-            onClick={() => setSourcesOpen(true)}
-            title="Sources"
-            aria-label="Sources and attribution"
-          >
-            <svg className="btn-sources-icon__svg" viewBox="0 0 24 24" width="12" height="12" aria-hidden>
-              <path
-                fill="currentColor"
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
-              />
-            </svg>
-          </button>
-        </div>
+        ) : null}
         <div className={`loading-bar ${loading ? "is-active" : ""}`} aria-hidden />
 
         {bookOptions.length > 0 ? (
@@ -520,6 +526,32 @@ export default function App() {
             chapter={chapter}
             onChapterChange={handleChapterChange}
             chapterMax={chapterMax}
+            compact={isMobileLayout}
+            mobileToolbar={
+              isMobileLayout ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-mobile-menu"
+                    aria-expanded={moreMenuOpen}
+                    aria-haspopup="dialog"
+                    aria-controls="more-menu-dialog"
+                    onClick={() => setMoreMenuOpen(true)}
+                  >
+                    <svg className="btn-mobile-menu__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                      <path
+                        fill="currentColor"
+                        d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"
+                      />
+                    </svg>
+                    <span className="btn-mobile-menu__text">Menu</span>
+                  </button>
+                  <span className={`load-indicator ${loading ? "is-loading" : ""}`} aria-live="polite">
+                    {loading ? "…" : ""}
+                  </span>
+                </>
+              ) : undefined
+            }
           />
         ) : null}
       </header>
@@ -541,14 +573,26 @@ export default function App() {
         <section className="pane" aria-labelledby="en-title">
           <div className="pane-head pane-head-en">
             <div className="pane-head-en-main">
-              <h2 id="en-title">{enFullName}</h2>
-              <div className="ref-line" aria-live="polite">
-                {enRefLine}
+              <h2
+                id="en-title"
+                title={isMobileLayout ? enFullName : undefined}
+                {...(isMobileLayout
+                  ? { "aria-label": `${enFullName}. ${enRefLine}` }
+                  : {})}
+              >
+                {isMobileLayout ? enTranslation : enFullName}
+              </h2>
+              {!isMobileLayout ? (
+                <div className="ref-line" aria-live="polite">
+                  {enRefLine}
+                </div>
+              ) : null}
+            </div>
+            {!isMobileLayout ? (
+              <div className="en-chapter-promo" aria-hidden="true">
+                {chapter}
               </div>
-            </div>
-            <div className="en-chapter-promo" aria-hidden="true">
-              {chapter}
-            </div>
+            ) : null}
           </div>
           <div ref={enScrollRef} className="pane-scroll-en" role="region" aria-label="English Bible scroll area">
             <div className="niv-verses" aria-label="English Bible text">
@@ -573,6 +617,34 @@ export default function App() {
         </section>
       </main>
 
+      <MoreMenuDialog
+        open={moreMenuOpen}
+        onClose={() => setMoreMenuOpen(false)}
+        enTranslation={enTranslation}
+        enTranslations={enTranslations}
+        onEnTranslationChange={setEnTranslation}
+        redLetterOn={redLetterOn}
+        onRedLetterToggle={() =>
+          setRedLetterOn((v) => {
+            const next = !v;
+            try { localStorage.setItem("bible-red-letter", next ? "on" : "off"); } catch {}
+            return next;
+          })
+        }
+        darkMode={darkMode}
+        onDarkModeToggle={() => setDarkMode((v) => !v)}
+        zhSource={zhSource}
+        onZhSourceChange={setZhSource}
+        fontId={fontId}
+        presets={presets}
+        onFontIdChange={setFontId}
+        loading={loading}
+        onReload={forceReload}
+        onOpenSources={() => {
+          setMoreMenuOpen(false);
+          setSourcesOpen(true);
+        }}
+      />
       <SourcesDialog open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
     </div>
   );

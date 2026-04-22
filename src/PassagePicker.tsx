@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { WsBookDef } from "./constants";
 import { ChapterSlider } from "./ChapterSlider";
 
@@ -13,6 +13,10 @@ type Props = {
   chapter: number;
   onChapterChange: (n: number) => void;
   chapterMax?: number;
+  /** Tighter book/chapter row for narrow viewports (paired with `.passage-picker--compact` CSS). */
+  compact?: boolean;
+  /** Rendered at the start of the passage row (e.g. menu + loading on mobile). */
+  mobileToolbar?: ReactNode;
 };
 
 function bookLabel(r: BookRow): string {
@@ -30,7 +34,16 @@ function matchesQuery(r: BookRow, raw: string): boolean {
   );
 }
 
-export function PassagePicker({ rows, bookId, onBookChange, chapter, onChapterChange, chapterMax }: Props) {
+export function PassagePicker({
+  rows,
+  bookId,
+  onBookChange,
+  chapter,
+  onChapterChange,
+  chapterMax,
+  compact = false,
+  mobileToolbar,
+}: Props) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -124,17 +137,17 @@ export function PassagePicker({ rows, bookId, onBookChange, chapter, onChapterCh
 
   useEffect(() => {
     if (!chapterPopoverOpen) return;
-    const onDocMouse = (e: MouseEvent) => {
+    const onDocPointer = (e: PointerEvent) => {
       const el = chapterPopoverRef.current;
       if (el && !el.contains(e.target as Node)) setChapterPopoverOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setChapterPopoverOpen(false);
     };
-    document.addEventListener("mousedown", onDocMouse);
+    document.addEventListener("pointerdown", onDocPointer, true);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDocMouse);
+      document.removeEventListener("pointerdown", onDocPointer, true);
       document.removeEventListener("keydown", onKey);
     };
   }, [chapterPopoverOpen]);
@@ -142,6 +155,33 @@ export function PassagePicker({ rows, bookId, onBookChange, chapter, onChapterCh
   const maxCh = chapterMax && chapterMax > 0 ? chapterMax : 150;
   const safeChapter = Math.min(Math.max(1, chapter), maxCh);
   const canNext = chapterMax != null && chapterMax > 0 ? chapter < chapterMax : false;
+
+  const chapterGridPopover =
+    chapterPopoverOpen && maxCh > 1 ? (
+      <div
+        id={`${listId}-chapter-grid`}
+        className="chapter-grid-popover"
+        role="dialog"
+        aria-label={`Chapters 1–${maxCh}`}
+      >
+        <div className="chapter-grid-popover-inner">
+          {Array.from({ length: maxCh }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`chapter-grid-btn${n === safeChapter ? " is-current" : ""}`}
+              aria-current={n === safeChapter ? "true" : undefined}
+              onClick={() => {
+                onChapterChange(n);
+                setChapterPopoverOpen(false);
+              }}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   const renderOption = (r: BookRow, idx: number) => {
     const hi = highlight === idx;
@@ -174,8 +214,14 @@ export function PassagePicker({ rows, bookId, onBookChange, chapter, onChapterCh
   };
 
   return (
-    <nav className="passage-picker" aria-label="Passage">
+    <nav
+      className={`passage-picker${compact ? " passage-picker--compact" : ""}`}
+      aria-label="Passage"
+    >
       <div className="passage-picker-row">
+        {compact && mobileToolbar ? (
+          <div className="passage-picker-mobile-toolbar">{mobileToolbar}</div>
+        ) : null}
         <div className="passage-books passage-books-search">
           <label htmlFor={listId} className="sr-only">
             Search or select book
@@ -193,7 +239,7 @@ export function PassagePicker({ rows, bookId, onBookChange, chapter, onChapterCh
               }
               aria-autocomplete="list"
               className="input-biblical book-search-input"
-              placeholder={focused ? "Type to filter…" : "Search or open for all books…"}
+              placeholder={focused ? (compact ? "Filter…" : "Type to filter…") : compact ? "Book" : "Search or open for all books…"}
               autoComplete="off"
               spellCheck={false}
               enterKeyHint="search"
@@ -250,113 +296,134 @@ export function PassagePicker({ rows, bookId, onBookChange, chapter, onChapterCh
         <div className="passage-picker-divider" aria-hidden="true" />
 
         <div className="passage-chapter">
-          <span className="chapter-section-label" id="chapter-range-label">
+          <span
+            className={`chapter-section-label${compact ? " sr-only" : ""}`}
+            id="chapter-range-label"
+          >
             Chapter
           </span>
           <div className="chapter-toolbar" role="group" aria-labelledby="chapter-range-label">
-            <button
-              type="button"
-              className="step-btn"
-              aria-label="Previous chapter"
-              disabled={chapter <= 1}
-              onClick={() => onChapterChange(Math.max(1, chapter - 1))}
-            >
-              ‹
-            </button>
-            <div className="chapter-slider-cluster" ref={chapterPopoverRef}>
-              <ChapterSlider
-                id="chapter-range"
-                min={1}
-                max={maxCh}
-                value={safeChapter}
-                onChange={onChapterChange}
-                aria-labelledby="chapter-range-label"
-                disabled={maxCh <= 1}
-              />
-              <button
-                type="button"
-                className={`chapter-grid-toggle${chapterPopoverOpen ? " is-open" : ""}`}
-                aria-expanded={chapterPopoverOpen}
-                aria-controls={`${listId}-chapter-grid`}
-                aria-haspopup="dialog"
-                aria-label="Open chapter picker: choose any chapter"
-                disabled={maxCh <= 1}
-                title="All chapters"
-                onClick={() => setChapterPopoverOpen((o) => !o)}
-              >
-                <svg className="chapter-grid-toggle-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden>
-                  {[0, 1, 2].flatMap((row) =>
-                    [0, 1, 2].map((col) => (
-                      <rect
-                        key={`${row}-${col}`}
-                        x={1 + col * 5}
-                        y={1 + row * 5}
-                        width="4"
-                        height="4"
-                        rx="1"
-                        fill="currentColor"
-                      />
-                    )),
-                  )}
-                </svg>
-              </button>
-              {chapterPopoverOpen ? (
-                <div
-                  id={`${listId}-chapter-grid`}
-                  className="chapter-grid-popover"
-                  role="dialog"
-                  aria-label={`Chapters 1–${maxCh}`}
+            {compact ? (
+              <div className="chapter-popover-anchor" ref={chapterPopoverRef}>
+                <button
+                  type="button"
+                  className={`chapter-picker-chip${chapterPopoverOpen ? " is-open" : ""}`}
+                  aria-expanded={chapterPopoverOpen}
+                  aria-controls={maxCh > 1 ? `${listId}-chapter-grid` : undefined}
+                  aria-haspopup={maxCh > 1 ? "dialog" : undefined}
+                  aria-label={
+                    chapterMax != null && chapterMax > 0
+                      ? `Chapter ${safeChapter} of ${chapterMax}, open chapter list`
+                      : `Chapter ${safeChapter}, open chapter list`
+                  }
+                  disabled={maxCh <= 1}
+                  onClick={() => maxCh > 1 && setChapterPopoverOpen((o) => !o)}
                 >
-                  <div className="chapter-grid-popover-inner">
-                    {Array.from({ length: maxCh }, (_, i) => i + 1).map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        className={`chapter-grid-btn${n === safeChapter ? " is-current" : ""}`}
-                        aria-current={n === safeChapter ? "true" : undefined}
-                        onClick={() => {
-                          onChapterChange(n);
-                          setChapterPopoverOpen(false);
-                        }}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              className="step-btn"
-              aria-label="Next chapter"
-              disabled={!canNext}
-              onClick={() => onChapterChange(Math.min(maxCh, chapter + 1))}
-            >
-              ›
-            </button>
-            <input
-              id="chapter-num"
-              type="number"
-              className="input-biblical chapter-num-input"
-              min={1}
-              max={chapterMax ?? undefined}
-              value={chapter}
-              aria-label="Chapter number"
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (!Number.isFinite(n)) return;
-                onChapterChange(Math.max(1, n));
-              }}
-            />
-            {chapterMax != null && chapterMax > 0 ? (
-              <span className="chapter-denom" aria-hidden>
-                / {chapterMax}
-              </span>
+                  <span className="chapter-picker-chip__value" aria-hidden>
+                    {safeChapter}
+                  </span>
+                  {chapterMax != null && chapterMax > 0 ? (
+                    <span className="chapter-picker-chip__denom" aria-hidden>
+                      {" "}
+                      / {chapterMax}
+                    </span>
+                  ) : (
+                    <span className="chapter-picker-chip__denom chapter-picker-chip__denom--unknown" aria-hidden>
+                      {" "}
+                      / ?
+                    </span>
+                  )}
+                  {maxCh > 1 ? (
+                    <svg className="chapter-picker-chip__caret" width="11" height="11" viewBox="0 0 12 12" aria-hidden>
+                      <path fill="currentColor" d="M6 8.2 1.8 4h8.4L6 8.2z" />
+                    </svg>
+                  ) : null}
+                </button>
+                {chapterGridPopover}
+              </div>
             ) : (
-              <span className="chapter-denom muted" title="Chapter count when available">
-                / ?
-              </span>
+              <>
+                <button
+                  type="button"
+                  className="step-btn"
+                  aria-label="Previous chapter"
+                  disabled={chapter <= 1}
+                  onClick={() => onChapterChange(Math.max(1, chapter - 1))}
+                >
+                  ‹
+                </button>
+                <div className="chapter-slider-cluster" ref={chapterPopoverRef}>
+                  <ChapterSlider
+                    id="chapter-range"
+                    min={1}
+                    max={maxCh}
+                    value={safeChapter}
+                    onChange={onChapterChange}
+                    aria-labelledby="chapter-range-label"
+                    disabled={maxCh <= 1}
+                  />
+                  <button
+                    type="button"
+                    className={`chapter-grid-toggle${chapterPopoverOpen ? " is-open" : ""}`}
+                    aria-expanded={chapterPopoverOpen}
+                    aria-controls={maxCh > 1 ? `${listId}-chapter-grid` : undefined}
+                    aria-haspopup="dialog"
+                    aria-label="Open chapter picker: choose any chapter"
+                    disabled={maxCh <= 1}
+                    title="All chapters"
+                    onClick={() => setChapterPopoverOpen((o) => !o)}
+                  >
+                    <svg className="chapter-grid-toggle-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+                      {[0, 1, 2].flatMap((row) =>
+                        [0, 1, 2].map((col) => (
+                          <rect
+                            key={`${row}-${col}`}
+                            x={1 + col * 5}
+                            y={1 + row * 5}
+                            width="4"
+                            height="4"
+                            rx="1"
+                            fill="currentColor"
+                          />
+                        )),
+                      )}
+                    </svg>
+                  </button>
+                  {chapterGridPopover}
+                </div>
+                <button
+                  type="button"
+                  className="step-btn"
+                  aria-label="Next chapter"
+                  disabled={!canNext}
+                  onClick={() => onChapterChange(Math.min(maxCh, chapter + 1))}
+                >
+                  ›
+                </button>
+                <input
+                  id="chapter-num"
+                  type="number"
+                  className="input-biblical chapter-num-input"
+                  min={1}
+                  max={chapterMax ?? undefined}
+                  value={chapter}
+                  aria-label="Chapter number"
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    onChapterChange(Math.max(1, n));
+                  }}
+                />
+                {chapterMax != null && chapterMax > 0 ? (
+                  <span className="chapter-denom" aria-hidden>
+                    / {chapterMax}
+                  </span>
+                ) : (
+                  <span className="chapter-denom muted" title="Chapter count when available">
+                    / ?
+                  </span>
+                )}
+              </>
             )}
           </div>
         </div>

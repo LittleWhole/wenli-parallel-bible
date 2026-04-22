@@ -511,8 +511,8 @@ body {
   gap: 0.5rem 0.75rem;
   min-width: 0;
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
+  /* Visible so the chapter grid popover (abs. below the row) is not clipped */
+  overflow: visible;
   scrollbar-width: thin;
 }
 
@@ -587,6 +587,7 @@ body {
 .passage-books-search {
   flex: 1 1 min(24rem, 100%);
   min-width: 0;
+  overflow-x: auto;
 }
 
 .book-search-wrap {
@@ -875,7 +876,7 @@ body {
   position: absolute;
   left: 0;
   top: calc(100% + 6px);
-  z-index: 100;
+  z-index: 300;
   min-width: min(100%, 12rem);
   max-width: min(calc(100vw - 2rem), 18rem);
   max-height: min(46vh, 14rem);
@@ -1312,3 +1313,288 @@ body {
 /* stylelint-enable */
 
 /* 專名線 / 地名線 / 書名線 inside Jesus's words inherit currentColor (var(--red-letter)) — red underlines. */
+
+/* ── Mobile layout (narrow viewport): menu for secondary controls, denser text chrome ── */
+
+.app-root--mobile .app-header {
+  padding: 0.35rem 0.5rem 0.4rem;
+  gap: 0.3rem;
+}
+
+.passage-picker-mobile-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.btn-mobile-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.38rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--btn-grad-top), var(--btn-grad-bot));
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.btn-mobile-menu:hover {
+  border-color: var(--accent);
+}
+
+.btn-mobile-menu:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.btn-mobile-menu__icon {
+  display: block;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.btn-mobile-menu__text {
+  line-height: 1;
+}
+
+.app-root--mobile .passage-picker {
+  padding: 0.28rem 0.4rem;
+  border-radius: 10px;
+}
+
+.app-root--mobile .passage-picker-row {
+  gap: 0.35rem 0.45rem;
+}
+
+.app-root--mobile .book-search-input {
+  font-size: 0.76rem;
+  padding: 0.3rem 0.45rem 0.3rem 0.55rem;
+}
+
+/* Mobile: single chapter chip opens the grid only (no slider / step / number field) */
+.chapter-popover-anchor {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.chapter-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.32rem 0.5rem 0.32rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--btn-grad-top), var(--btn-grad-bot));
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 2px var(--shadow);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chapter-picker-chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.chapter-picker-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.chapter-picker-chip.is-open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.chapter-picker-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.chapter-picker-chip__value {
+  color: var(--accent);
+}
+
+.chapter-picker-chip__denom {
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+
+.chapter-picker-chip__denom--unknown {
+  opacity: 0.55;
+}
+
+.chapter-picker-chip__caret {
+  flex-shrink: 0;
+  margin-inline-start: 0.15rem;
+  opacity: 0.75;
+}
+
+.passage-picker--compact .passage-chapter {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.app-root--mobile .pane {
+  padding: 0.45rem 0.55rem 0.35rem;
+}
+
+.app-root--mobile .pane h2 {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+}
+
+.app-root--mobile .classical-pane .ref-line {
+  display: none;
+}
+
+.app-root--mobile .classical-pane h2 {
+  margin-bottom: 0.25rem;
+}
+
+.app-root--mobile .niv-verse {
+  margin: 0 0 0.5rem;
+  padding: 0.42rem 0.5rem;
+  line-height: 1.52;
+}
+
+.app-root--mobile .vertical-verses {
+  gap: 0.45rem;
+  padding-bottom: 0.2rem;
+}
+
+.app-root--mobile .verse-col {
+  font-size: 1.05rem;
+  line-height: 1.72;
+  letter-spacing: 0.12em;
+  padding: 0.45rem 0.32rem;
+  border-radius: 10px;
+}
+
+.app-root--mobile .status {
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+  padding-bottom: 0.3rem;
+}
+
+/* More menu dialog (mirrors sources-dialog shell) */
+.more-menu-dialog {
+  max-width: min(22rem, calc(100vw - 1.25rem));
+  width: calc(100vw - 1.25rem);
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 16px 48px var(--shadow-deep);
+}
+
+.more-menu-dialog::backdrop {
+  background: rgba(15, 12, 10, 0.45);
+}
+
+[data-theme="dark"] .more-menu-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.more-menu-dialog__box {
+  padding: 1rem 1rem 0.75rem;
+}
+
+.more-menu-dialog__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.more-menu-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.more-menu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.more-menu-field label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.more-menu-select {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.more-menu-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.more-menu-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+}
+
+.more-menu-field--buttons {
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.more-menu-btn-full {
+  width: 100%;
+}
+
+.btn-sources-outline {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.btn-sources-outline:hover {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+}
+
+.more-menu-dialog__footer {
+  margin: 0.75rem 0 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+}

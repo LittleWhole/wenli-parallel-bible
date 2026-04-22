@@ -265,7 +265,9 @@ export function renderZhWithProperNouns(
         ? splitByCornerQuotes(text, startsInSpeech)
         : splitByYue(text, startsInSpeech);
     const hasMarkedRedSpeech = speechSegs.some((s) => s.red);
-    if (forceFullVerseRed && !hasMarkedRedSpeech) {
+    // 國漢文: only colour text strictly inside 「…」; do not force whole-verse red when
+    // English is fully quoted but Korean has no corner quotes (avoids spurious red).
+    if (forceFullVerseRed && !hasMarkedRedSpeech && redSpeechMode !== "corner") {
       return (
         <span className="words-of-jesus" translate="no">
           {renderAnnotatedChunk(text, k)}

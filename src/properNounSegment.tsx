@@ -73,6 +73,21 @@ function wrapMandatoryProperInPlain(plain: string, keyFn: () => string): ReactNo
 
 type YueSeg = { text: string; red: boolean };
 
+/**
+ * Multi-character discourse openers (longest wins), same role as {@link jaJesusSpeech}’s
+ * `JA_JESUS_OPEN_PATTERNS`: one non-red span, then speech is red until ○.
+ * Ensures e.g.「耶穌曰、」keeps the enumeration comma with the attribution, not in red speech.
+ */
+const ZH_YUE_OPEN_PATTERNS = ["耶穌曰、", "耶穌曰", "耶稣曰、", "耶稣曰"].sort((a, b) => b.length - a.length);
+
+function matchYueOpenAt(text: string, i: number): string | null {
+  const tail = text.slice(i);
+  for (const p of ZH_YUE_OPEN_PATTERNS) {
+    if (tail.startsWith(p)) return p;
+  }
+  return null;
+}
+
 export function zhVerseHasYueRedSpeech(text: string, startsInSpeech = false): boolean {
   return splitByYue(text, startsInSpeech).segs.some((s) => s.red);
 }
@@ -81,19 +96,35 @@ function splitByYue(text: string, startsInSpeech = false): { segs: YueSeg[]; end
   const segs: YueSeg[] = [];
   let inSpeech = startsInSpeech;
   let segStart = 0;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
+  let i = 0;
+  while (i < text.length) {
+    const open = matchYueOpenAt(text, i);
+    if (open) {
+      if (i > segStart) segs.push({ text: text.slice(segStart, i), red: inSpeech });
+      segs.push({ text: open, red: false });
+      i += open.length;
+      segStart = i;
+      inSpeech = true;
+      continue;
+    }
+    const ch = text[i]!;
     if (ch === "曰") {
       if (i > segStart) segs.push({ text: text.slice(segStart, i), red: inSpeech });
       segs.push({ text: "曰", red: false });
-      segStart = i + 1;
+      i += 1;
+      segStart = i;
       inSpeech = true;
-    } else if (ch === "○") {
+      continue;
+    }
+    if (ch === "○") {
       if (i > segStart) segs.push({ text: text.slice(segStart, i), red: inSpeech });
       segs.push({ text: "○", red: false });
-      segStart = i + 1;
+      i += 1;
+      segStart = i;
       inSpeech = false;
+      continue;
     }
+    i += 1;
   }
   if (segStart < text.length) segs.push({ text: text.slice(segStart), red: inSpeech });
   return { segs, endsInSpeech: inSpeech };

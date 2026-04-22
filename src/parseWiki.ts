@@ -1,3 +1,5 @@
+import { initialMichaelHanQuoteState, westernPunctuationToCjk } from "./westernToCjkPunctuation";
+
 /** Parse `{{verse|…}}` inner text → chapter number + verse label. */
 export function parseVerseInner(inner: string) {
   const s = inner.trim();
@@ -62,7 +64,52 @@ export function cleanWikiVerseText(raw: string) {
   return t;
 }
 
+/** 國漢文: wiki cleanup + Western ASCII punctuation → fullwidth CJK forms (single verse; no cross-verse quote carry). */
+export function cleanMichaelHanVerseText(raw: string): string {
+  return westernPunctuationToCjk(cleanWikiVerseText(raw)).text;
+}
+
 export type WikiVerse = { verse: string; text: string };
+
+/**
+ * Han Wiki {@link https://wiki.michaelhan.net 국한문성경} page wikitext uses `<sup>chapter:verse</sup>`
+ * markers (not `{{verse|…}}`).
+ */
+export function extractMichaelHanVersesForChapter(
+  wikitext: string,
+  targetChapter: number,
+  cleanVerseText: (raw: string) => string = cleanMichaelHanVerseText,
+): WikiVerse[] {
+  const found: WikiVerse[] = [];
+  const re = /<sup>(\d+):(\d+)<\/sup>/gi;
+  let m: RegExpExecArray | null;
+  /** So a `` ` `` in verse N and closing `'` in verse N+1 still become 「…」 (not a stray 「 from `'`). */
+  let hanQuoteState = initialMichaelHanQuoteState();
+  const useHanQuoteCarry = cleanVerseText === cleanMichaelHanVerseText;
+  while ((m = re.exec(wikitext)) !== null) {
+    const chapter = parseInt(m[1]!, 10);
+    if (chapter !== targetChapter) continue;
+    const verseNum = parseInt(m[2]!, 10);
+    const textStart = m.index + m[0].length;
+    const rest = wikitext.slice(textStart);
+    const next = rest.search(/<sup>\d+:\d+<\/sup>/i);
+    const rawText = next < 0 ? rest : rest.slice(0, next);
+    if (useHanQuoteCarry) {
+      const stripped = cleanWikiVerseText(rawText);
+      const { text, quoteState } = westernPunctuationToCjk(stripped, hanQuoteState);
+      hanQuoteState = quoteState;
+      found.push({ verse: String(verseNum), text });
+    } else {
+      found.push({ verse: String(verseNum), text: cleanVerseText(rawText) });
+    }
+  }
+  found.sort(
+    (a, b) =>
+      verseSortKey(a.verse) - verseSortKey(b.verse) ||
+      String(a.verse).localeCompare(String(b.verse), "zh-Hant"),
+  );
+  return found;
+}
 
 export function extractVersesForChapter(
   wikitext: string,

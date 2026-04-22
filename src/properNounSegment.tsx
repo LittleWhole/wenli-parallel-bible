@@ -99,6 +99,41 @@ function splitByYue(text: string, startsInSpeech = false): { segs: YueSeg[]; end
   return { segs, endsInSpeech: inSpeech };
 }
 
+/**
+ * 國漢文: after ASCII punctuation → 「…」, direct speech uses those corner quotes. Text strictly between
+ * them is red; the marks stay uncoloured (same role as 曰 / ○ for 文理).
+ */
+function splitByCornerQuotes(text: string, startsInsideQuote = false): { segs: YueSeg[]; endsInSpeech: boolean } {
+  const segs: YueSeg[] = [];
+  let depth = startsInsideQuote ? 1 : 0;
+  let segStart = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (ch === "「") {
+      if (i > segStart) segs.push({ text: text.slice(segStart, i), red: depth > 0 });
+      segs.push({ text: "「", red: false });
+      depth++;
+      segStart = i + 1;
+    } else if (ch === "」") {
+      if (i > segStart) segs.push({ text: text.slice(segStart, i), red: depth > 0 });
+      segs.push({ text: "」", red: false });
+      depth = Math.max(0, depth - 1);
+      segStart = i + 1;
+    }
+  }
+  if (segStart < text.length) segs.push({ text: text.slice(segStart), red: depth > 0 });
+  return { segs, endsInSpeech: depth > 0 };
+}
+
+export function zhVerseHasCornerQuoteRedSpeech(text: string, startsInsideQuote = false): boolean {
+  return splitByCornerQuotes(text, startsInsideQuote).segs.some((s) => s.red);
+}
+
+/** Whether an unclosed 「 carries into the next verse (for speech-state continuity). */
+export function cornerQuoteEndsInSpeech(text: string, startsInsideQuote = false): boolean {
+  return splitByCornerQuotes(text, startsInsideQuote).endsInSpeech;
+}
+
 // ── Core annotated-text renderer ──────────────────────────────────────────────
 
 const SENTINEL_RE = /[\uE001\uE002\uE003\uE004]/g;
@@ -209,12 +244,15 @@ function renderAnnotatedChunk(text: string, keyFn: () => string): ReactNode[] {
 /**
  * Renders verse body with 書名線 / 專名線 / 地名線 and optional words-of-Jesus colouring.
  */
+export type ZhRedSpeechMode = "yue" | "corner";
+
 export function renderZhWithProperNouns(
   text: string,
   verseKey: string,
   isRedLetterVerse = false,
   startsInSpeech = false,
   forceFullVerseRed = false,
+  redSpeechMode: ZhRedSpeechMode = "yue",
 ): ReactNode {
   let keyIdx = 0;
   const k = () => `${verseKey}-${keyIdx++}`;
@@ -222,17 +260,20 @@ export function renderZhWithProperNouns(
   const parts: ReactNode[] = [];
 
   if (isRedLetterVerse) {
-    const { segs: yueSegs } = splitByYue(text, startsInSpeech);
-    const hasYueRed = yueSegs.some((s) => s.red);
-    if (forceFullVerseRed && !hasYueRed) {
+    const { segs: speechSegs } =
+      redSpeechMode === "corner"
+        ? splitByCornerQuotes(text, startsInSpeech)
+        : splitByYue(text, startsInSpeech);
+    const hasMarkedRedSpeech = speechSegs.some((s) => s.red);
+    if (forceFullVerseRed && !hasMarkedRedSpeech) {
       return (
         <span className="words-of-jesus" translate="no">
           {renderAnnotatedChunk(text, k)}
         </span>
       );
     }
-    if (hasYueRed) {
-      for (const ySeg of yueSegs) {
+    if (hasMarkedRedSpeech) {
+      for (const ySeg of speechSegs) {
         const nodes = renderAnnotatedChunk(ySeg.text, k);
         if (ySeg.red) {
           parts.push(<span className="words-of-jesus" key={k()}>{nodes}</span>);

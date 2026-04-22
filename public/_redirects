@@ -1,0 +1,2 @@
+# Same-origin proxy for Han Wiki (avoids browser CORS). Used when the app calls `/__hanwiki/rest.php/...`.
+/__hanwiki/* https://wiki.michaelhan.net/:splat 200

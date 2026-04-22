@@ -123,9 +123,14 @@ body {
 
 .header-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 0.4rem 0.55rem;
+  gap: 0.35rem 0.45rem;
+  min-width: 0;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .app-header h1 {
@@ -138,12 +143,138 @@ body {
   color: var(--accent);
   line-height: 1.2;
   flex-shrink: 0;
+  white-space: nowrap;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Far-right compact info control (toolbar order: … settings, load indicator, this button) */
+.btn-sources-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-left: auto;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.btn-sources-icon:hover {
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.btn-sources-icon:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.btn-sources-icon__svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.sources-dialog {
+  max-width: min(32rem, calc(100vw - 2rem));
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 16px 48px var(--shadow-deep);
+}
+
+.sources-dialog::backdrop {
+  background: rgba(15, 12, 10, 0.45);
+}
+
+[data-theme="dark"] .sources-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.sources-dialog__box {
+  padding: 1rem 1.15rem 0.85rem;
+}
+
+.sources-dialog__title {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.sources-dialog__body {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.sources-dialog__body h3 {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.sources-dialog__body h3:first-child {
+  margin-top: 0;
+}
+
+.sources-dialog__body p {
+  margin: 0 0 0.5rem;
+  color: var(--ink-muted);
+}
+
+.sources-dialog__body ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.sources-dialog__body li {
+  margin-bottom: 0.45rem;
+}
+
+.sources-dialog__body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.sources-dialog__footer {
+  margin: 0.85rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-sources-close {
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--btn-grad-top), var(--btn-grad-bot));
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.btn-sources-close:hover {
+  border-color: var(--line-strong);
 }
 
 .header-settings {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.35rem 0.45rem;
   flex: 1;
@@ -195,6 +326,11 @@ body {
 
 .select-zh-font {
   max-width: min(11rem, 38vw);
+}
+
+.header-toolbar .select-zh-source {
+  max-width: min(22rem, 42vw);
+  min-width: 7rem;
 }
 
 .setting-en-translation {
@@ -319,7 +455,6 @@ body {
   text-align: center;
   transition: opacity 0.15s ease;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .load-indicator.is-loading {
@@ -371,10 +506,14 @@ body {
 
 .passage-picker-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.5rem 0.75rem;
   min-width: 0;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .passage-books {
@@ -405,7 +544,7 @@ body {
   min-width: 0;
   align-items: center;
   gap: 0.45rem 0.55rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .chapter-section-label {
@@ -809,13 +948,6 @@ body {
 @media (max-width: 720px) {
   .passage-picker-divider {
     display: none;
-  }
-
-  .passage-chapter {
-    border-top: 1px solid var(--line);
-    padding-top: 0.45rem;
-    margin-top: 0.1rem;
-    width: 100%;
   }
 }
 

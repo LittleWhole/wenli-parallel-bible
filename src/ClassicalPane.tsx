@@ -1,10 +1,14 @@
 import { useMemo, type RefObject } from "react";
 import type { WikiVerse } from "./parseWiki";
 import { jaVerseHasJesusSpeech, splitByJapaneseJesus } from "./jaJesusSpeech";
-import { zhVerseHasYueRedSpeech } from "./properNounSegment";
+import {
+  cornerQuoteEndsInSpeech,
+  zhVerseHasCornerQuoteRedSpeech,
+  zhVerseHasYueRedSpeech,
+} from "./properNounSegment";
 import { ZhVerseBody } from "./ZhVerseBody";
 import { MeijiVerseBody } from "./MeijiVerseBody";
-import { meijiClassicalPaneTitle, meijiIsNewTestament, type ZhSource } from "./zhSource";
+import { classicalPaneHeading, meijiIsNewTestament, type ZhSource } from "./zhSource";
 
 type Props = {
   horizontalRef: RefObject<HTMLDivElement | null>;
@@ -40,7 +44,7 @@ export function ClassicalPane({
 }: Props) {
   const cols = displayVerses(verses);
 
-  // Pre-compute per-verse speech start state (曰/○ for 文理; イエス…/「」 for 明治).
+  // Pre-compute per-verse speech start state (曰/○ for 文理; 「…」 for 國漢文; イエス…/「」 for 明治).
   // When English is 100% red-letter but no discourse red segments appear, we force full-verse red and do
   // not carry speech state onward. If discourse rules do produce red, carry behaves as usual.
   const speechStateMap = useMemo(() => {
@@ -58,13 +62,17 @@ export function ClassicalPane({
         englishFullyRedVerses.has(verseNum) &&
         (zhSource === "meiji"
           ? !jaVerseHasJesusSpeech(v.text, inSpeech)
-          : !zhVerseHasYueRedSpeech(v.text, inSpeech));
+          : zhSource === "koreanHan"
+            ? !zhVerseHasCornerQuoteRedSpeech(v.text, inSpeech)
+            : !zhVerseHasYueRedSpeech(v.text, inSpeech));
       if (blockCarry) {
         inSpeech = false;
         continue;
       }
       if (zhSource === "meiji") {
         inSpeech = splitByJapaneseJesus(v.text, inSpeech).endsInSpeech;
+      } else if (zhSource === "koreanHan") {
+        inSpeech = cornerQuoteEndsInSpeech(v.text, inSpeech);
       } else {
         for (const ch of v.text) {
           if (ch === "曰") inSpeech = true;
@@ -75,19 +83,23 @@ export function ClassicalPane({
     return map;
   }, [verses, redLetterVerses, englishFullyRedVerses, zhSource]);
 
-  const paneTitle = zhSource === "meiji" ? meijiClassicalPaneTitle(bookId) : "文理和合譯本";
+  const paneTitle = classicalPaneHeading(zhSource, bookId);
   const paneScrollLabel =
-    zhSource === "meiji"
+      zhSource === "meiji"
       ? meijiIsNewTestament(bookId)
-        ? "Japanese Bible scroll area (Meiji New Testament, Taisho 4)"
-        : "Japanese Bible scroll area (Meiji Old Testament, bungo)"
-      : "Classical Chinese scroll area";
+        ? "Japanese column scroll area (New Testament)"
+        : "Japanese column scroll area (Old Testament)"
+      : zhSource === "koreanHan"
+        ? "CJK column scroll area"
+        : "Classical Chinese scroll area";
   const paneTextLabel =
     zhSource === "meiji"
       ? meijiIsNewTestament(bookId)
-        ? "Meiji New Testament text with furigana"
-        : "Meiji Old Testament text with furigana"
-      : "Classical Chinese text";
+        ? "Japanese New Testament text with furigana"
+        : "Japanese Old Testament text with furigana"
+      : zhSource === "koreanHan"
+        ? "CJK column text"
+        : "Classical Chinese text";
 
   return (
     <section
@@ -132,6 +144,7 @@ export function ClassicalPane({
                     isRedLetterVerse={redLetterVerses.has(verseNum)}
                     startsInSpeech={speechStateMap.get(verseNum) ?? false}
                     forceFullVerseRed={englishFullyRedVerses.has(verseNum)}
+                    redSpeechMode={zhSource === "koreanHan" ? "corner" : "yue"}
                   />
                 )}
               </div>

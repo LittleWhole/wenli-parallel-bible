@@ -11,12 +11,18 @@ import {
 import { fetchJson } from "./api";
 import { fetchJaWikisourceWikitext } from "./jaWikisource";
 import { fetchExistingWsBookSet, fetchWikisourceWikitext } from "./wikisource";
-import { extractVersesForChapter, type WikiVerse } from "./parseWiki";
+import {
+  extractMichaelHanVersesForChapter,
+  extractVersesForChapter,
+  type WikiVerse,
+} from "./parseWiki";
 import { cleanMeijiVerseText } from "./parseMeiji";
 import { extractMeijiGenesisChapter } from "./meijiOt";
 import { meijiJaBookTitle } from "./meijiBooks";
 import { extractTaisho4NtChapterFromBooks } from "./parseTaisho4";
 import { taisho4NtPageTitles } from "./taisho4Nt";
+import { michaelHanPageTitle } from "./michaelhanBooks";
+import { fetchMichaelHanWikitext } from "./michaelhanWiki";
 import {
   loadZhSource,
   meijiIsNewTestament,
@@ -29,6 +35,7 @@ import { useChineseFont } from "./useChineseFont";
 import { useParallelScroll } from "./useParallelScroll";
 import { ClassicalPane } from "./ClassicalPane";
 import { PassagePicker, type BookRow } from "./PassagePicker";
+import { SourcesDialog } from "./SourcesDialog";
 import "./index.css";
 
 type BollsBook = { bookid: string; chapters?: number };
@@ -128,6 +135,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [hoveredVerse, setHoveredVerse] = useState<number | null>(null);
   const [zhSource, setZhSource] = useState<ZhSource>(() => loadZhSource());
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   // Pre-process English verses: strip HTML and carry open-quote state across consecutive
   // red-letter verses so multi-verse speeches stay highlighted end-to-end.
@@ -224,14 +232,15 @@ export default function App() {
         const opts: BookRow[] = [];
         for (const def of WS_BOOKS) {
           if (zhSource === "wenli" && wsPresent && !wsPresent.has(def.ws)) continue;
+          /* koreanHan + meiji: all Bolls books; no Wikisource index filter */
           const b = byId[String(def.id)];
           opts.push({ def, chapters: b?.chapters });
         }
         if (!opts.length) {
           throw new Error(
             zhSource === "wenli"
-              ? "維基文庫上找不到《聖經 (文理和合)》任何子頁；請稍後再試。 Cound not find any subpages of the Bible (Wenli Union) on Wikisource; please try again later."
-              : "Could not get book list from Bolls. 無法從 Bolls 取得書卷列表。",
+              ? "此模式下沒有可用的書卷，請稍後再試。 No books available for this source; try again later."
+              : "無法取得書卷列表。 Could not load book list.",
           );
         }
         setBookOptions(opts);
@@ -274,11 +283,12 @@ export default function App() {
       return;
     }
     const ch = Math.max(1, Math.floor(Number(chapter)) || 1);
-    const label =
+    const cjkBookLine =
       zhSource === "meiji"
         ? `${def.en} · ${meijiJaBookTitle(bookId) ?? def.ws}`
-        : `${def.en} · ${def.ws}`;
-
+        : zhSource === "koreanHan"
+          ? `${def.en} · ${michaelHanPageTitle(bookId) ?? def.ws}`
+          : `${def.en} · ${def.ws}`;
     try {
       const enP = fetchJson(`${BOLLS}/get-text/${enTranslation}/${bookId}/${ch}/`, { signal }) as Promise<
         { verse: number; text: string }[]
@@ -291,6 +301,12 @@ export default function App() {
         const { wikitext, title } = await fetchWikisourceWikitext(def.ws, signal);
         zhPageTitle = title;
         zh = extractVersesForChapter(wikitext, ch);
+      } else if (zhSource === "koreanHan") {
+        const mh = michaelHanPageTitle(bookId);
+        if (!mh) throw new Error("Unknown book for 國漢文聖經.");
+        const { wikitext, title } = await fetchMichaelHanWikitext(mh, signal);
+        zhPageTitle = title;
+        zh = extractMichaelHanVersesForChapter(wikitext, ch);
       } else {
         const jaBase = meijiJaBookTitle(bookId);
         if (!jaBase) throw new Error("Unknown book for Meiji source.");
@@ -322,20 +338,21 @@ export default function App() {
       if (!zh.length) {
         const meijiEmpty =
           zhSource === "meiji" && meijiIsNewTestament(bookId)
-            ? `明治元譯（新約 · 大正四年）此卷未解析到節文（頁面「${zhPageTitle}」）。 Meiji New Testament (Taisho 4): chapter ${ch} not parsed (page "${zhPageTitle}").`
+            ? `此卷未能解析第 ${ch} 節（「${zhPageTitle}」）。 New Testament: chapter ${ch} not parsed.`
             : zhSource === "meiji"
-              ? `明治元譯（舊約 · 文語訳）此卷未解析到節文（頁面「${zhPageTitle}」）。 Meiji Old Testament (bungo): chapter ${ch} not parsed (page "${zhPageTitle}").`
+              ? `此卷未能解析第 ${ch} 節（「${zhPageTitle}」）。 Old Testament: chapter ${ch} not parsed.`
               : "";
         throw new Error(
           zhSource === "wenli"
-            ? `維基文庫此卷未解析到第 ${ch} 節（頁面「${zhPageTitle}」）。請確認該章存在，或章節標記與源文一致。 Wikisource chapter ${ch} not parsed (page "${zhPageTitle}"). Please check if the chapter exists, or the chapter markers match the source text.`
-            : meijiEmpty,
+            ? `此卷未能解析第 ${ch} 節（「${zhPageTitle}」）。請確認該章存在或標記一致。 Chapter ${ch} not parsed.`
+            : zhSource === "koreanHan"
+              ? `此卷未能解析第 ${ch} 節（「${zhPageTitle}」）。 Chapter ${ch} not parsed.`
+              : meijiEmpty,
         );
       }
 
-      const ref = `${label} ${ch}`;
-      setZhRefLine(`${ref}`);
-      setEnRefLine(`${ref} · ${enTranslation}`);
+      setZhRefLine(`${cjkBookLine} ${ch}`);
+      setEnRefLine(`${def.en} ${ch} · ${enTranslation}`);
       setZhVerses(zh);
       setEnVerses(enRaw);
       setScrollRevision((n) => n + 1);
@@ -440,11 +457,12 @@ export default function App() {
               <select
                 id="zh-source"
                 className="select-compact select-zh-source"
-                aria-label="Chinese column Bible text"
+                aria-label="Parallel column Bible text"
                 value={zhSource}
                 onChange={(e) => setZhSource(e.target.value as ZhSource)}
               >
                 <option value="wenli">{ZH_SOURCE_LABEL.wenli}</option>
+                <option value="koreanHan">{ZH_SOURCE_LABEL.koreanHan}</option>
                 <option value="meiji">{ZH_SOURCE_LABEL.meiji}</option>
               </select>
             </div>
@@ -477,6 +495,20 @@ export default function App() {
           <span className={`load-indicator ${loading ? "is-loading" : ""}`} aria-live="polite">
             {loading ? "…" : ""}
           </span>
+          <button
+            type="button"
+            className="btn-sources-icon"
+            onClick={() => setSourcesOpen(true)}
+            title="Sources"
+            aria-label="Sources and attribution"
+          >
+            <svg className="btn-sources-icon__svg" viewBox="0 0 24 24" width="12" height="12" aria-hidden>
+              <path
+                fill="currentColor"
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+              />
+            </svg>
+          </button>
         </div>
         <div className={`loading-bar ${loading ? "is-active" : ""}`} aria-hidden />
 
@@ -540,6 +572,8 @@ export default function App() {
           </div>
         </section>
       </main>
+
+      <SourcesDialog open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
     </div>
   );
 }

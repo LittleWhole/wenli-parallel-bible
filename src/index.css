@@ -587,7 +587,18 @@ body {
 .passage-books-search {
   flex: 1 1 min(24rem, 100%);
   min-width: 0;
+  /* Do not set overflow here: overflow-x: auto would pair with overflow-y: auto and clip
+     the book list (abs. below the input). Horizontal scroll lives in .book-search-input-track. */
+  overflow: visible;
+}
+
+/* Scrolls long book names; sibling .book-autocomplete is not inside this box, so it is not clipped. */
+.book-search-input-track {
+  min-width: 0;
+  width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: thin;
 }
 
 .book-search-wrap {
@@ -1373,6 +1384,16 @@ body {
 
 .app-root--mobile .passage-picker-row {
   gap: 0.35rem 0.45rem;
+}
+
+/* Book list above the chapter chip / grid (z-index 300) and overlapping content below the header */
+.app-root--mobile .book-autocomplete,
+.app-root--mobile .book-autocomplete-empty {
+  z-index: 450;
+}
+
+.app-root--mobile .app-header {
+  z-index: 24;
 }
 
 .app-root--mobile .book-search-input {

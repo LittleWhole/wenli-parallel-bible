@@ -227,36 +227,38 @@ export function PassagePicker({
             Search or select book
           </label>
           <div className={`book-search-wrap${listOpen ? " is-open" : ""}`}>
-            <input
-              ref={inputRef}
-              id={listId}
-              type="search"
-              role="combobox"
-              aria-expanded={listOpen}
-              aria-controls={`${listId}-listbox`}
-              aria-activedescendant={
-                listOpen && flatList[highlight] ? `${listId}-opt-${flatList[highlight].def.id}` : undefined
-              }
-              aria-autocomplete="list"
-              className="input-biblical book-search-input"
-              placeholder={focused ? (compact ? "Filter…" : "Type to filter…") : compact ? "Book" : "Search or open for all books…"}
-              autoComplete="off"
-              spellCheck={false}
-              enterKeyHint="search"
-              value={inputValue}
-              onChange={(e) => onInputChange(e.target.value)}
-              onFocus={() => {
-                setFocused(true);
-                setQuery("");
-              }}
-              onBlur={() => {
-                window.setTimeout(() => {
-                  setFocused(false);
+            <div className="book-search-input-track">
+              <input
+                ref={inputRef}
+                id={listId}
+                type="search"
+                role="combobox"
+                aria-expanded={listOpen}
+                aria-controls={`${listId}-listbox`}
+                aria-activedescendant={
+                  listOpen && flatList[highlight] ? `${listId}-opt-${flatList[highlight].def.id}` : undefined
+                }
+                aria-autocomplete="list"
+                className="input-biblical book-search-input"
+                placeholder={focused ? (compact ? "Filter…" : "Type to filter…") : compact ? "Book" : "Search or open for all books…"}
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="search"
+                value={inputValue}
+                onChange={(e) => onInputChange(e.target.value)}
+                onFocus={() => {
+                  setFocused(true);
                   setQuery("");
-                }, 150);
-              }}
-              onKeyDown={onKeyDown}
-            />
+                }}
+                onBlur={() => {
+                  window.setTimeout(() => {
+                    setFocused(false);
+                    setQuery("");
+                  }, 150);
+                }}
+                onKeyDown={onKeyDown}
+              />
+            </div>
             {listOpen && flatList.length > 0 ? (
               <ul
                 ref={listRef}

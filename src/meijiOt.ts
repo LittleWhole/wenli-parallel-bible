@@ -11,16 +11,16 @@ export const MEIJI_OT_GENESIS_RUBY_PAGE_2 = "創世記2 (文語訳ルビ付)";
 
 /**
  * Index: {@link https://ja.wikisource.org/wiki/明治元訳旧約聖書 明治元訳旧約聖書} — standalone subpages
- * e.g. `創世記(文語訳)`, `出エジプト記(文語訳)` (not `明治元訳旧約聖書/…`, which has no such pages).
+ * e.g. `創世記`, `出エジプト記` (not `明治元訳旧約聖書/…`, which has no such pages).
  */
-export const MEIJI_OT_GENESIS_FULL = "創世記(文語訳)";
+export const MEIJI_OT_GENESIS_FULL = "創世記";
 
 /** Genesis 創世記1+2 (ルビ付) cover through chapter 25 per Wikisource section notes; 26+ use full book. */
 export const MEIJI_OT_GENESIS_RUBY_THROUGH_CHAPTER = 25;
 
 /**
- * Load Meiji OT wikitext for book 1 (Genesis): ルビ付 parts 1–2 for early chapters, else full `創世記(文語訳)`.
- * Other books: caller passes the usual `…(文語訳)` title.
+ * Load Meiji OT wikitext for book 1 (Genesis): ルビ付 parts 1–2 for early chapters, else full `創世記`.
+ * Other books: caller passes the usual `…` title.
  */
 export async function fetchMeijiGenesisWikitext(
   chapter: number,

@@ -9,7 +9,7 @@ export function meijiIsNewTestament(bookId: number): boolean {
 
 /** Pane heading for the classical column when 明治元譯 is selected (source switches with the active book). */
 export function meijiClassicalPaneTitle(bookId: number): string {
-  return meijiIsNewTestament(bookId) ? "明治元譯 · 新約（大正四年）" : "明治元譯 · 舊約（文語訳）";
+  return meijiIsNewTestament(bookId) ? "明治元譯 · 新約（大正四年）" : "明治元譯 · 舊約";
 }
 
 export function classicalPaneHeading(zhSource: ZhSource, bookId: number): string {

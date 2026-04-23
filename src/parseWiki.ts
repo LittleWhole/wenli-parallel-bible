@@ -1,3 +1,4 @@
+import { decodeHtmlCharacterReferences } from "./strings";
 import { initialMichaelHanQuoteState, westernPunctuationToCjk } from "./westernToCjkPunctuation";
 
 /** Parse `{{verse|…}}` inner text → chapter number + verse label. */
@@ -61,7 +62,7 @@ export function cleanWikiVerseText(raw: string) {
   // Remove any remaining templates (multi-arg, no content, etc.).
   t = t.replace(/\{\{[^}]*\}\}/g, "");
   t = t.replace(/[ \t\u3000]+/g, " ").trim();
-  return t;
+  return decodeHtmlCharacterReferences(t);
 }
 
 /** 國漢文: wiki cleanup + Western ASCII punctuation → fullwidth CJK forms (single verse; no cross-verse quote carry). */

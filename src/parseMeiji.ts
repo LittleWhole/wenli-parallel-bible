@@ -1,3 +1,4 @@
+import { decodeHtmlCharacterReferences } from "./strings";
 import { DU_CLOSE, DU_OPEN, UL_CLOSE, UL_OPEN } from "./parseWiki";
 
 /** PUA markers for {{ruby|base|rt}} after cleaning (walked by MeijiVerseBody). */
@@ -32,5 +33,5 @@ export function cleanMeijiVerseText(raw: string): string {
   t = t.replace(/\{\{[^|{}]+\|([^|{}]+)\}\}/g, "$1");
   t = t.replace(/\{\{[^}]*\}\}/g, "");
   t = t.replace(/[ \t\u3000]+/g, " ").trim();
-  return t;
+  return decodeHtmlCharacterReferences(t);
 }
